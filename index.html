@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#7A5CFA">
+  <meta name="description" content="讓每一塊記憶，都有專屬的聲音。">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="芋音">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>TaroEcho 芋音</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="https://placehold.co/180x180/7A5CFA/ffffff?text=芋">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --taro:#7A5CFA; --taro-l:#B490FF; }
+    *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    html,body { height:100%; width:100%; overflow:hidden; font-family:'Noto Sans TC',system-ui,sans-serif; }
+    body { background:linear-gradient(135deg,#f5f3ff,#ede9fe 50%,#f0f4ff); display:flex; align-items:center; justify-content:center; }
+    #app { width:390px; height:844px; border-radius:54px; overflow:hidden; position:relative; box-shadow:0 60px 120px rgba(0,0,0,.3),inset 0 0 0 10px #1a1a1a; }
+    @media(max-width:430px){ body{background:#fff;align-items:flex-start;justify-content:flex-start;} #app{width:100vw;height:100vh;height:100dvh;border-radius:0;box-shadow:none;} }
+
+    .screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;transition:transform .32s cubic-bezier(.4,0,.2,1),opacity .32s ease;will-change:transform;}
+    .screen.offright{transform:translateX(100%);}
+    .screen.offleft{transform:translateX(-22%);opacity:0;}
+    .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+    .scroll::-webkit-scrollbar{display:none;}
+
+    .sb{height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:12px;font-weight:700;flex-shrink:0;z-index:5;}
+    .sb.light{color:#111;} .sb.dark{color:#fff;}
+    @media(max-width:430px){.sb{padding-top:env(safe-area-inset-top);height:calc(44px + env(safe-area-inset-top));}}
+
+    .nav{height:80px;display:flex;align-items:center;justify-content:space-around;padding:8px 8px 16px;flex-shrink:0;}
+    @media(max-width:430px){.nav{padding-bottom:max(16px,env(safe-area-inset-bottom));height:auto;}}
+    .nb{display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:none;cursor:pointer;padding:6px 14px;border-radius:14px;transition:transform .15s;font-family:inherit;}
+    .nb:active{transform:scale(.88);}
+    .nb i{font-size:20px;} .nb span{font-size:10px;font-weight:700;}
+    .nb.on i,.nb.on span{color:var(--taro);}
+    .nb:not(.on) i,.nb:not(.on) span{color:#C7C7CC;}
+
+    .card{background:#fff;border-radius:20px;}
+    .shad{box-shadow:0 4px 20px rgba(0,0,0,.07);}
+    .shad-t{box-shadow:0 8px 24px rgba(122,92,250,.35);}
+    .tap{cursor:pointer;transition:transform .18s,opacity .18s;}
+    .tap:active{transform:scale(.96);opacity:.85;}
+
+    .wb{width:4px;border-radius:4px;transform-origin:bottom;animation:wbounce 1.2s ease-in-out infinite alternate;}
+    @keyframes wbounce{0%{transform:scaleY(.25)}100%{transform:scaleY(1)}}
+
+    .nr{position:absolute;border-radius:50%;animation:nrex 2.4s cubic-bezier(.4,0,.6,1) infinite;}
+    @keyframes nrex{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.65);opacity:0}}
+    .nglow{animation:nglow 1.8s ease-in-out infinite alternate;}
+    @keyframes nglow{0%{box-shadow:0 0 0 0 rgba(122,92,250,.4)}100%{box-shadow:0 0 28px 8px rgba(122,92,250,.55)}}
+
+    .rp{animation:rpulse 2s ease-in-out infinite;}
+    @keyframes rpulse{0%,100%{transform:scale(1);opacity:.3}50%{transform:scale(1.45);opacity:0}}
+
+    .cpath{stroke-dasharray:600;stroke-dashoffset:600;animation:cdraw 1.8s ease forwards;}
+    @keyframes cdraw{to{stroke-dashoffset:0}}
+
+    .tog{background:#F1F0FF;border-radius:14px;padding:4px;display:flex;position:relative;}
+    .tog-track{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.1);transition:transform .25s cubic-bezier(.4,0,.2,1);}
+    .tog-track.r{transform:translateX(100%);}
+    .tog button{flex:1;padding:9px 0;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;position:relative;z-index:1;border-radius:10px;transition:color .2s;font-family:inherit;}
+
+    .grad{background:linear-gradient(135deg,var(--taro),var(--taro-l));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+
+    /* Toast */
+    #toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(0,0,0,.8);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:9998;pointer-events:none;white-space:nowrap;}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+    button{font-family:inherit;}
+    img{display:block;}
+    @keyframes bounce{0%{transform:translateY(0)}100%{transform:translateY(6px)}}
+  </style>
+</head>
+<body>
+<div id="app">
+
+<!-- ██ SPLASH ██ -->
+<div id="s-splash" class="screen" style="background:#fff;">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding:36px;position:relative;overflow:hidden;">
+    <img src="https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=800&auto=format&fit=crop" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.12;" alt="">
+    <div style="position:relative;z-index:1;">
+      <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--taro),var(--taro-l));display:flex;align-items:center;justify-content:center;margin-bottom:16px;box-shadow:0 8px 20px rgba(122,92,250,.4);">
+        <i class="fa-solid fa-wifi" style="color:#fff;font-size:22px;transform:rotate(90deg);display:block;"></i>
+      </div>
+      <h1 style="font-size:68px;font-weight:900;color:#111;line-height:1;letter-spacing:-3px;margin-bottom:10px;">Taro<br><span class="grad">Echo</span></h1>
+      <p style="color:#94A3B8;font-size:17px;font-weight:600;line-height:1.6;margin-bottom:44px;">讓每一塊記憶，<br>都有專屬的聲音。</p>
+      <button onclick="go('vault')" class="tap" style="width:100%;background:#111;color:#fff;border:none;border-radius:24px;padding:20px 28px;display:flex;justify-content:space-between;align-items:center;font-size:18px;font-weight:700;box-shadow:0 16px 36px rgba(0,0,0,.18);">
+        <span>開始聆聽</span>
+        <div style="width:42px;height:42px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-arrow-right" style="color:#111;font-size:15px;"></i></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ██ VAULT ██ -->
+<div id="s-vault" class="screen offright" style="background:#F9F8FF;">
+  <div class="sb light"><span>9:41</span><div style="display:flex;gap:5px;align-items:center;"><i class="fa-solid fa-signal" style="font-size:10px;"></i><i class="fa-solid fa-wifi" style="font-size:10px;"></i><i class="fa-solid fa-battery-full" style="font-size:14px;"></i></div></div>
+  <div class="scroll" style="padding:4px 20px 0;">
+    <p style="color:#94A3B8;font-weight:700;font-size:15px;margin-bottom:2px;">Welcome back,</p>
+    <h1 style="font-size:42px;font-weight:900;color:#111;letter-spacing:-1.5px;margin-bottom:20px;">Family<br>Vault</h1>
+    <div class="card shad" style="padding:20px;margin-bottom:20px;display:flex;align-items:flex-end;justify-content:space-between;">
+      <div><p style="color:#94A3B8;font-weight:700;font-size:13px;margin-bottom:4px;">Total Memories</p><p id="vault-count" style="font-size:54px;font-weight:900;color:#111;line-height:1;">0</p></div>
+      <button onclick="go('record')" class="tap" style="width:50px;height:50px;background:var(--taro);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;" class="shad-t"><i class="fa-solid fa-plus" style="color:#fff;font-size:20px;"></i></button>
+    </div>
+    <h3 style="font-size:20px;font-weight:900;color:#111;margin-bottom:14px;">Recent Echoes</h3>
+    <div id="vault-list"></div>
+    <div style="height:16px;"></div>
+  </div>
+  <div class="nav" style="background:#fff;border-top:1px solid #F1F0FF;">
+    <button class="nb on" onclick="go('vault')"><i class="fa-solid fa-house"></i><span>Home</span></button>
+    <button class="nb" onclick="go('gallery')"><i class="fa-solid fa-compass"></i><span>Discover</span></button>
+    <button class="nb" onclick="go('record')" style="margin-top:-18px;"><div style="width:50px;height:50px;background:var(--taro);border-radius:16px;display:flex;align-items:center;justify-content:center;" class="shad-t"><i class="fa-solid fa-microphone" style="color:#fff;font-size:20px;"></i></div><span>Record</span></button>
+    <button class="nb" onclick="go('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></button>
+  </div>
+</div>
+
+<!-- ██ PLAYER ██ -->
+<div id="s-player" class="screen offright" style="background:#fff;">
+  <div class="sb light"><span>9:41</span><div style="display:flex;gap:5px;align-items:center;"><i class="fa-solid fa-signal" style="font-size:10px;"></i><i class="fa-solid fa-wifi" style="font-size:10px;"></i><i class="fa-solid fa-battery-full" style="font-size:14px;"></i></div></div>
+  <div class="scroll" style="padding:0 20px 20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0 16px;">
+      <button onclick="goBack()" class="tap" style="width:38px;height:38px;background:#F1F0FF;border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-chevron-left" style="color:#111;font-size:14px;"></i></button>
+      <p style="font-size:13px;font-weight:700;color:#94A3B8;">Now Playing</p>
+      <button onclick="go('nfc')" class="tap" style="width:38px;height:38px;background:#F1F0FF;border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;" title="寫入 NFC 標籤"><i class="fa-solid fa-wifi" style="color:var(--taro);font-size:14px;transform:rotate(90deg);display:block;"></i></button>
+    </div>
+    <div style="width:100%;aspect-ratio:1;border-radius:28px;overflow:hidden;margin-bottom:22px;position:relative;background:#F1F0FF;" class="shad">
+      <div id="player-cover" style="width:100%;height:100%;background:linear-gradient(135deg,#ede9fe,#ddd6fe);display:flex;align-items:center;justify-content:center;">
+        <i class="fa-solid fa-microphone" style="font-size:64px;color:var(--taro);opacity:.3;"></i>
+      </div>
+      <div id="player-privacy-badge" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-radius:20px;padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#111;"><i class="fa-solid fa-lock" style="font-size:10px;color:var(--taro);"></i>Family Only</div>
+    </div>
+    <div style="margin-bottom:18px;">
+      <h1 id="player-title" style="font-size:26px;font-weight:900;color:#111;line-height:1.3;margin-bottom:4px;">—</h1>
+      <p id="player-date" style="color:#94A3B8;font-weight:600;font-size:14px;">—</p>
+    </div>
+    <!-- Waveform canvas -->
+    <canvas id="player-canvas" height="48" style="width:100%;height:48px;margin-bottom:14px;border-radius:8px;"></canvas>
+    <div style="margin-bottom:18px;">
+      <div id="prog-track" style="width:100%;height:4px;background:#F1F0FF;border-radius:4px;margin-bottom:8px;cursor:pointer;" onclick="scrub(event)"><div id="prog-bar" style="width:0%;height:100%;background:var(--taro);border-radius:4px;transition:width .1s;"></div></div>
+      <div style="display:flex;justify-content:space-between;"><span id="prog-cur" style="color:#94A3B8;font-size:12px;font-weight:600;">0:00</span><span id="prog-dur" style="color:#94A3B8;font-size:12px;font-weight:600;">0:00</span></div>
+    </div>
+    <div style="display:flex;justify-content:space-around;align-items:center;margin-bottom:20px;">
+      <button onclick="seekRel(-15)" class="tap" style="width:46px;height:46px;border:none;background:none;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-rotate-left" style="font-size:22px;color:#94A3B8;"></i></button>
+      <button id="play-btn" onclick="togglePlay()" class="tap" style="width:70px;height:70px;background:#111;border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.25);"><i class="fa-solid fa-play" style="color:#fff;font-size:24px;padding-left:3px;"></i></button>
+      <button onclick="seekRel(15)" class="tap" style="width:46px;height:46px;border:none;background:none;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-rotate-right" style="font-size:22px;color:#94A3B8;"></i></button>
+    </div>
+    <div class="tog" style="width:100%;"><div class="tog-track" id="priv-track"></div><button id="pb-priv" onclick="setPrivacy('private')" style="color:#111;"><i class="fa-solid fa-lock" style="margin-right:5px;"></i>Private</button><button id="pb-pub" onclick="setPrivacy('public')" style="color:#94A3B8;"><i class="fa-solid fa-globe" style="margin-right:5px;"></i>Public</button></div>
+    <!-- audio element -->
+    <audio id="audio-el" style="display:none;" preload="metadata"></audio>
+  </div>
+</div>
+
+<!-- ██ RECORD ██ -->
+<div id="s-record" class="screen offright" style="background:#0D0D0F;">
+  <div class="sb dark"><span>9:41</span><div style="display:flex;gap:5px;align-items:center;"><i class="fa-solid fa-signal" style="font-size:10px;"></i><i class="fa-solid fa-wifi" style="font-size:10px;"></i><i class="fa-solid fa-battery-full" style="font-size:14px;"></i></div></div>
+  <div style="flex:1;display:flex;flex-direction:column;padding:0 24px 16px;min-height:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0 12px;">
+      <button onclick="cancelRec()" class="tap" style="width:38px;height:38px;background:rgba(255,255,255,.1);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-xmark" style="color:#fff;font-size:16px;"></i></button>
+      <p style="font-size:13px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.06em;">新錄音</p>
+      <div style="width:38px;"></div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <h2 style="font-size:28px;font-weight:900;color:#fff;margin-bottom:8px;">留下聲音</h2>
+      <p style="color:rgba(255,255,255,.35);font-size:14px;margin-bottom:30px;text-align:center;">點擊開始錄音，再次點擊暫停</p>
+      <div style="position:relative;width:168px;height:168px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
+        <div id="rec-pulse-1" class="rp" style="position:absolute;inset:0;border-radius:50%;background:rgba(122,92,250,.22);display:none;"></div>
+        <div id="rec-pulse-2" class="rp" style="position:absolute;inset:12px;border-radius:50%;background:rgba(122,92,250,.18);animation-delay:.55s;display:none;"></div>
+        <button id="mic-btn" onclick="toggleRecording()" class="tap nglow" style="position:relative;z-index:1;width:90px;height:90px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--taro),var(--taro-l));"><i class="fa-solid fa-microphone" style="color:#fff;font-size:32px;"></i></button>
+      </div>
+      <p id="rec-timer" style="font-size:54px;font-weight:900;color:#fff;letter-spacing:-2px;margin-bottom:16px;">00:00</p>
+      <!-- Real-time waveform canvas -->
+      <canvas id="rec-canvas" width="300" height="48" style="width:280px;height:48px;opacity:0;transition:opacity .3s;margin-bottom:16px;"></canvas>
+      <!-- Title input -->
+      <div style="width:100%;background:rgba(255,255,255,.07);border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:10px;">
+        <i class="fa-solid fa-pencil" style="color:rgba(255,255,255,.3);font-size:14px;"></i>
+        <input id="rec-title" type="text" placeholder="為這段記憶命名…" style="flex:1;background:none;border:none;outline:none;color:#fff;font-size:14px;font-weight:600;font-family:inherit;" maxlength="40">
+      </div>
+    </div>
+    <button id="done-btn" onclick="finishRecording()" style="width:100%;background:rgba(255,255,255,.07);border:none;border-radius:20px;padding:17px;font-size:16px;font-weight:700;color:rgba(255,255,255,.25);cursor:not-allowed;transition:all .3s;" disabled>完成錄製</button>
+  </div>
+  <div class="nav" style="background:rgba(255,255,255,.05);backdrop-filter:blur(20px);border-top:1px solid rgba(255,255,255,.06);">
+    <button class="nb" onclick="cancelRec()"><i class="fa-solid fa-house" style="color:rgba(255,255,255,.35);"></i><span style="color:rgba(255,255,255,.35);">Home</span></button>
+    <button class="nb" onclick="go('gallery')"><i class="fa-solid fa-compass" style="color:rgba(255,255,255,.35);"></i><span style="color:rgba(255,255,255,.35);">Discover</span></button>
+    <button class="nb on" style="margin-top:-18px;"><div style="width:50px;height:50px;background:var(--taro);border-radius:16px;display:flex;align-items:center;justify-content:center;" class="shad-t"><i class="fa-solid fa-microphone" style="color:#fff;font-size:20px;"></i></div><span>Record</span></button>
+    <button class="nb" onclick="go('profile')"><i class="fa-solid fa-user" style="color:rgba(255,255,255,.35);"></i><span style="color:rgba(255,255,255,.35);">Profile</span></button>
+  </div>
+</div>
+
+<!-- ██ GALLERY ██ -->
+<div id="s-gallery" class="screen offright" style="background:#F9F8FF;">
+  <div class="sb light"><span>9:41</span><div style="display:flex;gap:5px;align-items:center;"><i class="fa-solid fa-signal" style="font-size:10px;"></i><i class="fa-solid fa-wifi" style="font-size:10px;"></i><i class="fa-solid fa-battery-full" style="font-size:14px;"></i></div></div>
+  <div class="scroll" style="padding:4px 20px 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;"><h1 style="font-size:26px;font-weight:900;color:#111;">公開聲音廣場</h1></div>
+    <div id="gallery-featured" style="margin-bottom:16px;"></div>
+    <p id="gallery-hot-label" style="font-size:14px;font-weight:700;color:#111;margin-bottom:10px;display:none;">更多記憶</p>
+    <div id="gallery-list"></div>
+    <div id="gallery-empty" style="display:none;padding:40px 0;text-align:center;"><i class="fa-solid fa-microphone" style="font-size:40px;color:#E2E8F0;margin-bottom:12px;"></i><p style="color:#94A3B8;font-weight:600;">還沒有公開的記憶</p><p style="color:#CBD5E1;font-size:12px;margin-top:4px;">錄製一段記憶並設為公開</p></div>
+    <div style="height:16px;"></div>
+  </div>
+  <div class="nav" style="background:#fff;border-top:1px solid #F1F0FF;">
+    <button class="nb" onclick="go('vault')"><i class="fa-solid fa-house"></i><span>Home</span></button>
+    <button class="nb on" onclick="go('gallery')"><i class="fa-solid fa-compass"></i><span>Discover</span></button>
+    <button class="nb" onclick="go('record')" style="margin-top:-18px;"><div style="width:50px;height:50px;background:#F1F0FF;border-radius:16px;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-microphone" style="color:#CBD5E1;font-size:20px;"></i></div><span>Record</span></button>
+    <button class="nb" onclick="go('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></button>
+  </div>
+</div>
+
+<!-- ██ PROFILE ██ -->
+<div id="s-profile" class="screen offright" style="background:#F9F8FF;">
+  <div class="sb light"><span>9:41</span><div style="display:flex;gap:5px;align-items:center;"><i class="fa-solid fa-signal" style="font-size:10px;"></i><i class="fa-solid fa-wifi" style="font-size:10px;"></i><i class="fa-solid fa-battery-full" style="font-size:14px;"></i></div></div>
+  <div class="scroll" style="padding:4px 20px 0;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <img src="https://i.pravatar.cc/112?img=47" style="width:56px;height:56px;border-radius:18px;object-fit:cover;box-shadow:0 4px 14px rgba(0,0,0,.1);" alt="">
+      <div style="flex:1;"><p style="font-size:17px;font-weight:900;color:#111;">林小雨</p><p style="font-size:12px;color:#94A3B8;font-weight:500;margin-top:2px;">家族記憶守護者</p></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div class="card shad" style="padding:16px;text-align:center;"><p id="profile-listens" style="font-size:28px;font-weight:900;color:var(--taro);">0</p><p style="font-size:11px;color:#94A3B8;font-weight:600;margin-top:2px;">Total Listens</p></div>
+      <div class="card shad" style="padding:16px;text-align:center;"><p id="profile-mem-count" style="font-size:28px;font-weight:900;color:#111;">0</p><p style="font-size:11px;color:#94A3B8;font-weight:600;margin-top:2px;">Memories</p></div>
+    </div>
+    <div class="card shad" style="padding:16px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><p style="font-size:14px;font-weight:700;color:#111;">Monthly Listens</p><span style="font-size:11px;font-weight:700;color:#16a34a;background:#f0fdf4;border-radius:8px;padding:2px 8px;">+34% ↑</span></div>
+      <svg viewBox="0 0 300 80" style="width:100%;height:68px;"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7A5CFA" stop-opacity=".3"/><stop offset="100%" stop-color="#7A5CFA" stop-opacity="0"/></linearGradient></defs><path d="M0,65 C20,65 30,52 60,44 C90,36 110,58 150,32 C190,8 220,44 260,24 C280,14 290,12 300,10 L300,80 L0,80 Z" fill="url(#cg)"/><path class="cpath" d="M0,65 C20,65 30,52 60,44 C90,36 110,58 150,32 C190,8 220,44 260,24 C280,14 290,12 300,10" fill="none" stroke="#7A5CFA" stroke-width="2.5" stroke-linecap="round"/><circle cx="300" cy="10" r="4" fill="#7A5CFA"/></svg>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:#CBD5E1;font-weight:600;padding:4px 2px 0;"><span>1月</span><span>2月</span><span>3月</span><span>4月</span><span>5月</span><span>6月</span></div>
+    </div>
+    <p style="font-size:14px;font-weight:700;color:#111;margin-bottom:10px;">設定</p>
+    <div onclick="go('nfc')" class="card shad tap" style="padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;"><div style="width:36px;height:36px;background:var(--taro);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid fa-wifi" style="color:#fff;font-size:14px;transform:rotate(90deg);display:block;"></i></div><div style="flex:1;"><p style="font-size:14px;font-weight:700;color:#111;">NFC 標籤連結</p><p style="font-size:11px;color:#94A3B8;margin-top:2px;">掃描連結家族記憶物件</p></div><i class="fa-solid fa-chevron-right" style="color:#CBD5E1;font-size:12px;"></i></div>
+    <div class="card shad tap" style="padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;" onclick="openMembers()"><div style="width:36px;height:36px;background:#F1F5F9;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid fa-users" style="color:#64748B;font-size:14px;"></i></div><div style="flex:1;"><p style="font-size:14px;font-weight:700;color:#111;">家族成員管理</p><p style="font-size:11px;color:#94A3B8;margin-top:2px;">邀請並管理家族成員</p></div><span id="member-badge" style="background:#111;color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:8px;">1</span></div>
+    <div class="card shad tap" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;" onclick="clearAllData()"><div style="width:36px;height:36px;background:#FFF1F2;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid fa-trash" style="color:#F43F5E;font-size:14px;"></i></div><div style="flex:1;"><p style="font-size:14px;font-weight:700;color:#111;">清除所有記憶</p><p style="font-size:11px;color:#94A3B8;margin-top:2px;">刪除本機所有錄音資料</p></div></div>
+    <div style="height:16px;"></div>
+  </div>
+  <div class="nav" style="background:#fff;border-top:1px solid #F1F0FF;">
+    <button class="nb" onclick="go('vault')"><i class="fa-solid fa-house"></i><span>Home</span></button>
+    <button class="nb" onclick="go('gallery')"><i class="fa-solid fa-compass"></i><span>Discover</span></button>
+    <button class="nb" onclick="go('record')" style="margin-top:-18px;"><div style="width:50px;height:50px;background:#F1F0FF;border-radius:16px;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-microphone" style="color:#CBD5E1;font-size:20px;"></i></div><span>Record</span></button>
+    <button class="nb on" onclick="go('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></button>
+  </div>
+</div>
+
+<!-- ██ NFC ██ -->
+<div id="s-nfc" class="screen offright" style="background:#0D0D0F;">
+  <div class="sb dark"><span>9:41</span><div style="display:flex;gap:5px;align-items:center;"><i class="fa-solid fa-signal" style="font-size:10px;"></i><i class="fa-solid fa-wifi" style="font-size:10px;"></i><i class="fa-solid fa-battery-full" style="font-size:14px;"></i></div></div>
+  <div style="flex:1;display:flex;flex-direction:column;padding:0 24px 16px;min-height:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0 12px;"><button onclick="goBack()" class="tap" style="width:38px;height:38px;background:rgba(255,255,255,.1);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-chevron-left" style="color:#fff;font-size:14px;"></i></button><p style="font-size:13px;font-weight:700;color:rgba(255,255,255,.35);letter-spacing:.06em;">NFC 標籤</p><div style="width:38px;"></div></div>
+
+    <!-- 當前綁定記憶 -->
+    <div id="nfc-mem-card" style="background:rgba(255,255,255,.07);border-radius:18px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <div style="width:44px;height:44px;border-radius:14px;background:var(--taro);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid fa-microphone" style="color:#fff;font-size:16px;"></i></div>
+      <div style="flex:1;min-width:0;"><p id="nfc-mem-name" style="font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">請先錄製一段記憶</p><p id="nfc-mem-sub" style="font-size:11px;color:rgba(255,255,255,.35);margin-top:2px;">從播放器點 NFC 按鈕可選擇記憶</p></div>
+    </div>
+
+    <!-- scanning state -->
+    <div id="nfc-scanning" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <div style="position:relative;width:180px;height:180px;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <div class="nr" style="width:180px;height:180px;background:rgba(122,92,250,.1);"></div>
+        <div class="nr" style="width:140px;height:140px;background:rgba(122,92,250,.16);animation-delay:.7s;"></div>
+        <div class="nr" style="width:100px;height:100px;background:rgba(122,92,250,.22);animation-delay:1.4s;"></div>
+        <div class="nglow" style="position:relative;z-index:1;width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,var(--taro),var(--taro-l));display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-wifi" style="color:#fff;font-size:24px;transform:rotate(90deg);display:block;"></i></div>
+      </div>
+      <p style="font-size:22px;font-weight:900;color:#fff;margin-bottom:6px;">靠近標籤</p>
+      <p style="color:rgba(255,255,255,.35);font-size:13px;text-align:center;line-height:1.8;">將手機背面靠近<br><span style="color:var(--taro);font-weight:700;">芋頭 NFC 標籤</span><br>即可讀取或寫入</p>
+    </div>
+    <!-- found state -->
+    <div id="nfc-found" style="flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;">
+      <div class="shad-t" style="width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,var(--taro),var(--taro-l));display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><i class="fa-solid fa-check" style="color:#fff;font-size:28px;"></i></div>
+      <p style="font-size:20px;font-weight:900;color:#fff;margin-bottom:4px;text-align:center;">標籤已識別！</p>
+      <p id="nfc-serial" style="color:rgba(255,255,255,.3);font-size:11px;margin-bottom:16px;">序號 —</p>
+      <div style="width:100%;background:rgba(255,255,255,.07);border-radius:18px;padding:14px;display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+        <div style="width:40px;height:40px;border-radius:12px;background:var(--taro);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid fa-microphone" style="color:#fff;font-size:14px;"></i></div>
+        <div style="flex:1;min-width:0;"><p id="nfc-found-title" style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</p><p style="font-size:11px;color:rgba(255,255,255,.35);">已讀取記憶</p></div>
+        <button id="nfc-play-btn" style="width:32px;height:32px;background:var(--taro);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i class="fa-solid fa-play" style="color:#fff;font-size:10px;padding-left:1px;"></i></button>
+      </div>
+      <p id="nfc-write-st" style="color:rgba(255,255,255,.3);font-size:11px;text-align:center;min-height:16px;"></p>
+    </div>
+    <!-- error state -->
+    <div id="nfc-error" style="flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;">
+      <div style="width:68px;height:68px;border-radius:20px;background:rgba(239,68,68,.15);display:flex;align-items:center;justify-content:center;margin-bottom:12px;"><i class="fa-solid fa-xmark" style="color:#F87171;font-size:28px;"></i></div>
+      <p id="nfc-err-title" style="font-size:18px;font-weight:900;color:#fff;margin-bottom:6px;text-align:center;">NFC 不支援</p>
+      <p id="nfc-err-msg" style="color:rgba(255,255,255,.35);font-size:13px;text-align:center;line-height:1.7;"></p>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div style="display:flex;flex-direction:column;gap:8px;padding-top:12px;">
+      <button onclick="nfcWrite()" class="tap" style="width:100%;background:var(--taro);border:none;border-radius:16px;padding:14px;font-size:14px;font-weight:700;color:#fff;cursor:pointer;">
+        <i class="fa-solid fa-pen-to-square" style="margin-right:6px;"></i>將記憶寫入標籤
+      </button>
+      <button onclick="nfcScan()" class="tap" style="width:100%;background:rgba(255,255,255,.08);border:none;border-radius:16px;padding:14px;font-size:14px;font-weight:600;color:rgba(255,255,255,.6);cursor:pointer;">
+        <i class="fa-solid fa-wifi" style="margin-right:6px;transform:rotate(90deg);display:inline-block;"></i>掃描標籤
+      </button>
+      <button onclick="nfcReset()" style="width:100%;background:none;border:none;padding:10px;font-size:12px;color:rgba(255,255,255,.2);cursor:pointer;">重置</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- #app -->
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Members modal -->
+<div id="members-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(2px);z-index:9999;display:none;align-items:flex-end;justify-content:center;">
+  <div style="width:min(390px,100vw);max-height:80vh;background:#fff;border-radius:24px 24px 0 0;padding:14px 14px max(14px,env(safe-area-inset-bottom));display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <p style="font-size:16px;font-weight:900;color:#111;">家族成員管理</p>
+      <button onclick="closeMembers()" style="width:30px;height:30px;border:none;background:#F1F0FF;border-radius:50%;cursor:pointer;"><i class="fa-solid fa-xmark" style="color:#64748B;font-size:12px;"></i></button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <input id="member-input" type="text" placeholder="輸入成員名稱" maxlength="20" style="flex:1;border:1px solid #E2E8F0;border-radius:12px;padding:10px 12px;font-size:13px;outline:none;">
+      <button onclick="addMember()" style="border:none;background:var(--taro);color:#fff;border-radius:12px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;">新增</button>
+    </div>
+    <div id="members-list" style="overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px;"></div>
+  </div>
+</div>
+
+<script>
+/* ═════════════════════════════════════════════════════
+   DATABASE — IndexedDB
+   ═════════════════════════════════════════════════════ */
+let _db = null;
+
+function dbOpen() {
+  if (_db) return Promise.resolve(_db);
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('TaroEchoDB', 2);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('memories'))
+        d.createObjectStore('memories', { keyPath: 'id' });
+    };
+    req.onsuccess = e => { _db = e.target.result; res(_db); };
+    req.onerror = () => rej(req.error);
+  });
+}
+const dbTx = (store, mode, fn) => dbOpen().then(d => new Promise((res, rej) => {
+  const tx = d.transaction(store, mode);
+  const req = fn(tx.objectStore(store));
+  req.onsuccess = () => res(req.result);
+  req.onerror  = () => rej(req.error);
+}));
+const dbGetAll = store => dbTx(store, 'readonly', s => s.getAll());
+const dbGet    = (store, id) => dbTx(store, 'readonly', s => s.get(id));
+const dbPut    = (store, obj) => dbTx(store, 'readwrite', s => s.put(obj));
+const dbDel    = (store, id) => dbTx(store, 'readwrite', s => s.delete(id));
+
+/* ═════════════════════════════════════════════════════
+   STATE
+   ═════════════════════════════════════════════════════ */
+let memories = [];
+let currentMemory = null;
+let nfcTargetMemory = null; // memory to write to NFC tag
+let members = [];
+
+/* ═════════════════════════════════════════════════════
+   NAV
+   ═════════════════════════════════════════════════════ */
+let cur = 'splash', hist = ['splash'];
+
+function go(id) {
+  if (id === cur) return;
+  document.getElementById('s-' + cur).classList.add('offleft');
+  document.getElementById('s-' + id).classList.remove('offright', 'offleft');
+  hist.push(id); cur = id;
+  if (id !== 'record') stopRec(false);
+}
+function goBack() {
+  if (hist.length <= 1) return;
+  hist.pop();
+  const prev = hist[hist.length - 1];
+  document.getElementById('s-' + cur).classList.add('offright');
+  document.getElementById('s-' + prev).classList.remove('offright', 'offleft');
+  cur = prev;
+}
+
+/* ═════════════════════════════════════════════════════
+   INIT
+   ═════════════════════════════════════════════════════ */
+async function init() {
+  await dbOpen();
+  loadMembers();
+  memories = await dbGetAll('memories');
+  memories.sort((a, b) => b.recordedAt - a.recordedAt);
+  renderAll();
+
+  // NFC deep link: ?m=<id>
+  const params = new URLSearchParams(location.search);
+  const mid = params.get('m');
+  if (mid) {
+    const mem = memories.find(m => m.id === mid);
+    if (mem) { openPlayer(mem); return; }
+    // Not in local DB — show friendly message
+    toast('此標籤的記憶不在本裝置中');
+  }
+}
+
+/* ═════════════════════════════════════════════════════
+   RENDER
+   ═════════════════════════════════════════════════════ */
+function renderAll() {
+  renderVault();
+  renderGallery();
+  renderProfile();
+}
+
+function fmtDur(sec) {
+  const s = Math.floor(sec || 0);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+}
+function fmtDate(ts) {
+  return new Date(ts).toLocaleDateString('zh-TW', { year:'numeric', month:'2-digit', day:'2-digit' });
+}
+function privIcon(p) {
+  if (p === 'private') return '<i class="fa-solid fa-lock" style="font-size:10px;color:var(--taro);margin-right:3px;"></i>私密';
+  if (p === 'family')  return '<i class="fa-solid fa-users" style="font-size:10px;color:#64748B;margin-right:3px;"></i>家族';
+  return '<i class="fa-solid fa-globe" style="font-size:10px;color:#22c55e;margin-right:3px;"></i>公開';
+}
+
+function renderVault() {
+  const cnt = document.getElementById('vault-count');
+  const lst = document.getElementById('vault-list');
+  if (cnt) cnt.textContent = memories.length;
+  if (!lst) return;
+  if (memories.length === 0) {
+    lst.innerHTML = `<div style="padding:40px 0;text-align:center;"><i class="fa-solid fa-microphone" style="font-size:48px;color:#E2E8F0;margin-bottom:14px;"></i><p style="color:#94A3B8;font-weight:600;font-size:15px;">還沒有記憶</p><p style="color:#CBD5E1;font-size:13px;margin-top:4px;">點下方 + 開始錄製第一段</p></div>`;
+    return;
+  }
+  lst.innerHTML = memories.map(m => `
+    <div onclick="openPlayerById('${m.id}')" class="card shad tap" style="padding:16px;margin-bottom:12px;display:flex;gap:14px;align-items:center;">
+      <div style="width:60px;height:60px;border-radius:16px;background:#F1F0FF;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="fa-solid fa-microphone" style="color:var(--taro);font-size:22px;"></i>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <p style="font-weight:700;color:#111;font-size:15px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.title}</p>
+        <p style="color:#94A3B8;font-size:12px;font-weight:600;display:flex;align-items:center;">${privIcon(m.privacy)} · ${fmtDur(m.duration)}</p>
+      </div>
+      <div style="width:36px;height:36px;background:#F1F0FF;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+        <i class="fa-solid fa-play" style="color:var(--taro);font-size:12px;padding-left:2px;"></i>
+      </div>
+    </div>`).join('');
+}
+
+function renderGallery() {
+  const pub = memories.filter(m => m.privacy === 'public');
+  const feat = document.getElementById('gallery-featured');
+  const lst  = document.getElementById('gallery-list');
+  const lbl  = document.getElementById('gallery-hot-label');
+  const emp  = document.getElementById('gallery-empty');
+  if (!feat || !lst) return;
+  if (pub.length === 0) {
+    feat.innerHTML = ''; lst.innerHTML = '';
+    if (lbl) lbl.style.display = 'none';
+    if (emp) emp.style.display = 'block';
+    return;
+  }
+  if (emp) emp.style.display = 'none';
+  // Featured: first item
+  const f = pub[0];
+  feat.innerHTML = `
+    <div onclick="openPlayerById('${f.id}')" class="tap" style="position:relative;border-radius:24px;overflow:hidden;height:160px;">
+      <div style="width:100%;height:100%;background:linear-gradient(135deg,#7A5CFA,#B490FF);display:flex;align-items:center;justify-content:center;">
+        <i class="fa-solid fa-microphone" style="font-size:48px;color:rgba(255,255,255,.3);"></i>
+      </div>
+      <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.65) 0%,transparent 55%);"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;padding:14px;">
+        <p style="color:#fff;font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.title}</p>
+        <p style="color:rgba(255,255,255,.55);font-size:12px;margin-top:2px;">${fmtDate(f.recordedAt)} · ${f.listens} 聆聽</p>
+      </div>
+      <div style="position:absolute;bottom:12px;right:14px;width:38px;height:38px;border-radius:50%;background:var(--taro);display:flex;align-items:center;justify-content:center;" class="shad-t">
+        <i class="fa-solid fa-play" style="color:#fff;font-size:12px;padding-left:2px;"></i>
+      </div>
+    </div>`;
+  if (pub.length > 1) {
+    if (lbl) lbl.style.display = 'block';
+    lst.innerHTML = pub.slice(1).map(m => `
+      <div onclick="openPlayerById('${m.id}')" class="card shad tap" style="padding:14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;">
+        <div style="width:48px;height:48px;border-radius:14px;background:var(--taro);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fa-solid fa-microphone" style="color:#fff;font-size:18px;"></i>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <p style="font-weight:700;color:#111;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${m.title}</p>
+          <p style="color:#94A3B8;font-size:11px;font-weight:600;margin-top:2px;">${m.listens} Listens · ${fmtDur(m.duration)}</p>
+        </div>
+        <button style="width:32px;height:32px;background:var(--taro);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i class="fa-solid fa-play" style="color:#fff;font-size:10px;padding-left:2px;"></i></button>
+      </div>`).join('');
+  } else {
+    if (lbl) lbl.style.display = 'none';
+    lst.innerHTML = '';
+  }
+}
+
+function renderProfile() {
+  const total = memories.reduce((s, m) => s + (m.listens || 0), 0);
+  const tEl = document.getElementById('profile-listens');
+  const mEl = document.getElementById('profile-mem-count');
+  const badge = document.getElementById('member-badge');
+  if (tEl) tEl.textContent = total.toLocaleString();
+  if (mEl) mEl.textContent = memories.length;
+  if (badge) badge.textContent = String(members.length || 1);
+}
+
+function openPlayerById(id) {
+  const mem = memories.find(m => m.id === id);
+  if (!mem) {
+    toast('找不到該記憶，請重新整理後再試');
+    return;
+  }
+  openPlayer(mem);
+}
+
+/* ═════════════════════════════════════════════════════
+   PLAYER
+   ═════════════════════════════════════════════════════ */
+const audioEl = document.getElementById('audio-el');
+let playerBlobUrl = null;
+let playerCtx = null;
+let playerAnalyser = null;
+let playerAnimFrame = null;
+
+function openPlayer(mem) {
+  if (!mem) return;
+  currentMemory = mem;
+  nfcTargetMemory = mem;
+
+  // Update NFC screen target info
+  const nn = document.getElementById('nfc-mem-name');
+  const ns = document.getElementById('nfc-mem-sub');
+  if (nn) nn.textContent = mem.title;
+  if (ns) ns.textContent = `${fmtDur(mem.duration)} · 點「寫入標籤」綁定此記憶`;
+
+  // Update player UI
+  document.getElementById('player-title').textContent = mem.title;
+  document.getElementById('player-date').textContent = `Recorded ${fmtDate(mem.recordedAt)}`;
+  document.getElementById('prog-dur').textContent = fmtDur(mem.duration);
+  document.getElementById('prog-cur').textContent = '0:00';
+  document.getElementById('prog-bar').style.width = '0%';
+  document.getElementById('play-btn').querySelector('i').className = 'fa-solid fa-play';
+  document.getElementById('play-btn').querySelector('i').style.paddingLeft = '3px';
+
+  // Privacy badge
+  const badge = document.getElementById('player-privacy-badge');
+  badge.innerHTML = mem.privacy === 'private'
+    ? '<i class="fa-solid fa-lock" style="font-size:10px;color:var(--taro);"></i> Family Only'
+    : mem.privacy === 'family'
+    ? '<i class="fa-solid fa-users" style="font-size:10px;color:#64748B;"></i> Family'
+    : '<i class="fa-solid fa-globe" style="font-size:10px;color:#22c55e;"></i> Public';
+
+  setPrivacy(mem.privacy === 'public' ? 'public' : 'private');
+
+  // Load audio
+  if (playerBlobUrl) URL.revokeObjectURL(playerBlobUrl);
+  audioEl.src = '';
+  audioEl.pause();
+  cancelAnimationFrame(playerAnimFrame);
+  drawStaticWave();
+
+  if (mem.audioBlob) {
+    playerBlobUrl = URL.createObjectURL(mem.audioBlob);
+    audioEl.src = playerBlobUrl;
+    audioEl.load();
+    setupAudioViz();
+  } else {
+    // Demo memory — no audio, simulate
+    document.getElementById('prog-dur').textContent = fmtDur(mem.duration || 0);
+  }
+
+  // Increment listens
+  mem.listens = (mem.listens || 0) + 1;
+  dbPut('memories', mem);
+  renderProfile();
+
+  go('player');
+}
+
+function drawStaticWave() {
+  const canvas = document.getElementById('player-canvas');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth * devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  const heights = [30,55,80,60,100,45,70,35,90,55,40,75,50,85,30,65,50,45,90,35,70,55,80,50,65,40,75,30,60,40];
+  const bw = canvas.width / heights.length;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  heights.forEach((h, i) => {
+    const pct = h / 100;
+    const bh = pct * canvas.height;
+    ctx.fillStyle = i < 8 ? 'rgba(122,92,250,.9)' : 'rgba(226,232,240,.9)';
+    ctx.beginPath();
+    const x = i * bw + bw * .15;
+    const y = (canvas.height - bh) / 2;
+    ctx.roundRect(x, y, bw * .7, bh, 2);
+    ctx.fill();
+  });
+}
+
+function setupAudioViz() {
+  try {
+    if (!playerCtx) playerCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (playerAnalyser) { playerAnalyser.disconnect(); }
+    playerAnalyser = playerCtx.createAnalyser();
+    playerAnalyser.fftSize = 64;
+    const src = playerCtx.createMediaElementSource(audioEl);
+    src.connect(playerAnalyser);
+    playerAnalyser.connect(playerCtx.destination);
+  } catch(e) { /* already connected */ }
+}
+
+function drawPlayerWave() {
+  if (!playerAnalyser) return;
+  const canvas = document.getElementById('player-canvas');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth * devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  const data = new Uint8Array(playerAnalyser.frequencyBinCount);
+
+  function frame() {
+    if (audioEl.paused) { drawStaticWave(); return; }
+    playerAnimFrame = requestAnimationFrame(frame);
+    playerAnalyser.getByteFrequencyData(data);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const bw = canvas.width / data.length;
+    data.forEach((v, i) => {
+      const pct = v / 255;
+      const bh = Math.max(4, pct * canvas.height);
+      const y = (canvas.height - bh) / 2;
+      ctx.fillStyle = `rgba(122,92,250,${.3 + pct * .7})`;
+      ctx.beginPath();
+      ctx.roundRect(i * bw + bw * .1, y, bw * .8, bh, 2);
+      ctx.fill();
+    });
+  }
+  frame();
+}
+
+audioEl.addEventListener('timeupdate', () => {
+  if (!audioEl.duration) return;
+  const pct = audioEl.currentTime / audioEl.duration;
+  document.getElementById('prog-bar').style.width = (pct * 100).toFixed(1) + '%';
+  document.getElementById('prog-cur').textContent = fmtDur(audioEl.currentTime);
+});
+audioEl.addEventListener('ended', () => {
+  document.getElementById('play-btn').querySelector('i').className = 'fa-solid fa-play';
+  document.getElementById('play-btn').querySelector('i').style.paddingLeft = '3px';
+  cancelAnimationFrame(playerAnimFrame);
+  drawStaticWave();
+});
+audioEl.addEventListener('durationchange', () => {
+  if (audioEl.duration && isFinite(audioEl.duration)) {
+    document.getElementById('prog-dur').textContent = fmtDur(audioEl.duration);
+    if (currentMemory) { currentMemory.duration = Math.round(audioEl.duration); dbPut('memories', currentMemory); }
+  }
+});
+
+function togglePlay() {
+  if (!currentMemory) return;
+  if (!currentMemory.audioBlob) { toast('此為示範記憶，無音訊檔案'); return; }
+  if (playerCtx && playerCtx.state === 'suspended') playerCtx.resume();
+  if (audioEl.paused) {
+    audioEl.play();
+    document.getElementById('play-btn').querySelector('i').className = 'fa-solid fa-pause';
+    document.getElementById('play-btn').querySelector('i').style.paddingLeft = '0';
+    drawPlayerWave();
+  } else {
+    audioEl.pause();
+    document.getElementById('play-btn').querySelector('i').className = 'fa-solid fa-play';
+    document.getElementById('play-btn').querySelector('i').style.paddingLeft = '3px';
+    cancelAnimationFrame(playerAnimFrame);
+    drawStaticWave();
+  }
+}
+
+function seekRel(sec) {
+  if (!audioEl.src || !isFinite(audioEl.duration)) return;
+  audioEl.currentTime = Math.max(0, Math.min(audioEl.duration, audioEl.currentTime + sec));
+}
+
+function scrub(e) {
+  if (!audioEl.src || !isFinite(audioEl.duration)) return;
+  const pct = e.offsetX / e.currentTarget.offsetWidth;
+  audioEl.currentTime = pct * audioEl.duration;
+}
+
+function setPrivacy(v) {
+  const t = document.getElementById('priv-track');
+  const pp = document.getElementById('pb-priv');
+  const pu = document.getElementById('pb-pub');
+  if (v === 'public') {
+    t.classList.add('r'); pp.style.color = '#94A3B8'; pu.style.color = '#111';
+  } else {
+    t.classList.remove('r'); pp.style.color = '#111'; pu.style.color = '#94A3B8';
+  }
+  if (currentMemory) {
+    currentMemory.privacy = v;
+    dbPut('memories', currentMemory).then(() => {
+      memories = memories.map(m => m.id === currentMemory.id ? currentMemory : m);
+      renderAll();
+    });
+  }
+}
+
+/* ═════════════════════════════════════════════════════
+   RECORDING
+   ═════════════════════════════════════════════════════ */
+let mediaRecorder = null, audioChunks = [], recStream = null;
+let recCtx = null, recAnalyser = null, recAnimFrame = null;
+let recTimer = null, recSec = 0, recActive = false;
+
+async function toggleRecording() {
+  if (!recActive) {
+    // Start
+    try {
+      recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch(err) {
+      toast('無法存取麥克風：' + (err.name === 'NotAllowedError' ? '請允許麥克風權限' : err.message));
+      return;
+    }
+
+    recCtx = new (window.AudioContext || window.webkitAudioContext)();
+    recAnalyser = recCtx.createAnalyser();
+    recAnalyser.fftSize = 64;
+    const src = recCtx.createMediaStreamSource(recStream);
+    src.connect(recAnalyser);
+
+    const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg','audio/mp4']
+      .find(t => MediaRecorder.isTypeSupported(t)) || '';
+    mediaRecorder = new MediaRecorder(recStream, mimeType ? { mimeType } : {});
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.start(100);
+
+    recActive = true;
+    // Show pulses
+    document.getElementById('rec-pulse-1').style.display = 'block';
+    document.getElementById('rec-pulse-2').style.display = 'block';
+    // Change mic button to stop
+    const btn = document.getElementById('mic-btn');
+    btn.style.background = 'linear-gradient(135deg,#ef4444,#f97316)';
+    btn.innerHTML = '<i class="fa-solid fa-stop" style="color:#fff;font-size:28px;"></i>';
+
+    document.getElementById('rec-canvas').style.opacity = '1';
+    drawRecWave();
+
+    recSec = 0;
+    recTimer = setInterval(() => {
+      recSec++;
+      const m = String(Math.floor(recSec/60)).padStart(2,'0');
+      const s = String(recSec % 60).padStart(2,'0');
+      document.getElementById('rec-timer').textContent = m + ':' + s;
+      if (recSec >= 1) {
+        const db = document.getElementById('done-btn');
+        db.disabled = false;
+        db.style.background = 'var(--taro)';
+        db.style.color = '#fff';
+        db.style.cursor = 'pointer';
+      }
+    }, 1000);
+
+  } else {
+    // Pause / resume
+    if (mediaRecorder.state === 'recording') {
+      mediaRecorder.pause();
+      clearInterval(recTimer); recTimer = null;
+      cancelAnimationFrame(recAnimFrame);
+      document.getElementById('rec-canvas').style.opacity = '.3';
+      const btn = document.getElementById('mic-btn');
+      btn.style.background = 'linear-gradient(135deg,#7A5CFA,#B490FF)';
+      btn.innerHTML = '<i class="fa-solid fa-microphone" style="color:#fff;font-size:32px;"></i>';
+    } else if (mediaRecorder.state === 'paused') {
+      mediaRecorder.resume();
+      document.getElementById('rec-canvas').style.opacity = '1';
+      drawRecWave();
+      const btn = document.getElementById('mic-btn');
+      btn.style.background = 'linear-gradient(135deg,#ef4444,#f97316)';
+      btn.innerHTML = '<i class="fa-solid fa-stop" style="color:#fff;font-size:28px;"></i>';
+      recTimer = setInterval(() => {
+        recSec++;
+        const m = String(Math.floor(recSec/60)).padStart(2,'0');
+        const s = String(recSec % 60).padStart(2,'0');
+        document.getElementById('rec-timer').textContent = m + ':' + s;
+      }, 1000);
+    }
+  }
+}
+
+function drawRecWave() {
+  if (!recAnalyser) return;
+  const canvas = document.getElementById('rec-canvas');
+  const ctx = canvas.getContext('2d');
+  const data = new Uint8Array(recAnalyser.frequencyBinCount);
+  function frame() {
+    recAnimFrame = requestAnimationFrame(frame);
+    recAnalyser.getByteFrequencyData(data);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const bw = canvas.width / data.length;
+    data.forEach((v, i) => {
+      const pct = v / 255;
+      const bh = Math.max(3, pct * canvas.height);
+      const y = (canvas.height - bh) / 2;
+      ctx.fillStyle = `rgba(122,92,250,${.4 + pct * .6})`;
+      ctx.beginPath();
+      ctx.roundRect(i * bw + 1, y, Math.max(bw - 2, 1), bh, 2);
+      ctx.fill();
+    });
+  }
+  frame();
+}
+
+async function finishRecording() {
+  if (!mediaRecorder || !recActive) return;
+
+  mediaRecorder.stop();
+  recStream.getTracks().forEach(t => t.stop());
+  clearInterval(recTimer);
+  cancelAnimationFrame(recAnimFrame);
+
+  await new Promise(r => { mediaRecorder.onstop = r; });
+
+  const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+  const title = document.getElementById('rec-title').value.trim() || `記憶 ${new Date().toLocaleDateString('zh-TW')}`;
+  const id = 'mem-' + Date.now();
+
+  const mem = {
+    id, title,
+    privacy: 'private',
+    recordedAt: Date.now(),
+    duration: recSec,
+    listens: 0,
+    audioBlob: blob
+  };
+
+  await dbPut('memories', mem);
+  memories.unshift(mem);
+  renderAll();
+
+  stopRec(true);
+  toast('錄音已儲存！');
+  openPlayer(mem);
+}
+
+function stopRec(silent) {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    try { mediaRecorder.stop(); } catch(e) {}
+  }
+  if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+  clearInterval(recTimer); cancelAnimationFrame(recAnimFrame);
+  recActive = false; recSec = 0; mediaRecorder = null;
+
+  const t = document.getElementById('rec-timer'); if (t) t.textContent = '00:00';
+  const c = document.getElementById('rec-canvas'); if (c) c.style.opacity = '0';
+  const p1 = document.getElementById('rec-pulse-1'); if (p1) p1.style.display = 'none';
+  const p2 = document.getElementById('rec-pulse-2'); if (p2) p2.style.display = 'none';
+  const btn = document.getElementById('mic-btn');
+  if (btn) { btn.style.background = 'linear-gradient(135deg,var(--taro),var(--taro-l))'; btn.innerHTML = '<i class="fa-solid fa-microphone" style="color:#fff;font-size:32px;"></i>'; }
+  const db = document.getElementById('done-btn');
+  if (db) { db.disabled = true; db.style.background = 'rgba(255,255,255,.07)'; db.style.color = 'rgba(255,255,255,.25)'; db.style.cursor = 'not-allowed'; }
+  const ti = document.getElementById('rec-title'); if (ti) ti.value = '';
+}
+
+function cancelRec() { stopRec(true); go('vault'); }
+
+/* ═════════════════════════════════════════════════════
+   MEMBERS
+   ═════════════════════════════════════════════════════ */
+function loadMembers() {
+  try {
+    const raw = localStorage.getItem('taroecho_members');
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length) {
+      members = parsed.filter(n => typeof n === 'string' && n.trim()).map(n => n.trim()).slice(0, 20);
+      return;
+    }
+  } catch (e) {}
+  members = ['林小雨'];
+}
+
+function saveMembers() {
+  localStorage.setItem('taroecho_members', JSON.stringify(members));
+}
+
+function renderMembers() {
+  const list = document.getElementById('members-list');
+  if (!list) return;
+  if (members.length === 0) {
+    list.innerHTML = '<div style="padding:20px 0;text-align:center;color:#94A3B8;font-size:13px;">目前沒有成員，先新增第一位吧</div>';
+    return;
+  }
+  list.innerHTML = members.map((name, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#F8FAFC;border-radius:12px;padding:10px 12px;">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+        <div style="width:30px;height:30px;border-radius:10px;background:#EEF2FF;color:var(--taro);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;">${i + 1}</div>
+        <p style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+      </div>
+      <button onclick="removeMember(${i})" style="border:none;background:#FFF1F2;color:#F43F5E;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;">移除</button>
+    </div>
+  `).join('');
+}
+
+function openMembers() {
+  const modal = document.getElementById('members-modal');
+  if (!modal) return;
+  renderMembers();
+  modal.style.display = 'flex';
+}
+
+function closeMembers() {
+  const modal = document.getElementById('members-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function addMember() {
+  const input = document.getElementById('member-input');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) {
+    toast('請輸入成員名稱');
+    return;
+  }
+  if (members.some(m => m.toLowerCase() === name.toLowerCase())) {
+    toast('此成員已存在');
+    return;
+  }
+  members.push(name.slice(0, 20));
+  saveMembers();
+  renderMembers();
+  renderProfile();
+  input.value = '';
+  toast('成員已新增');
+}
+
+function removeMember(idx) {
+  if (idx < 0 || idx >= members.length) return;
+  const removed = members[idx];
+  members.splice(idx, 1);
+  if (members.length === 0) members = ['林小雨'];
+  saveMembers();
+  renderMembers();
+  renderProfile();
+  toast('已移除：' + removed);
+}
+
+/* ═════════════════════════════════════════════════════
+   NFC
+   ═════════════════════════════════════════════════════ */
+function nfcState(s) {
+  ['scanning','found','error'].forEach(n => {
+    const el = document.getElementById('nfc-' + n);
+    el.style.display = n === s ? 'flex' : 'none';
+  });
+}
+function nfcReset() {
+  nfcState('scanning');
+  document.getElementById('nfc-write-st').textContent = '';
+  if (window._nc) { window._nc.abort(); window._nc = null; }
+}
+
+async function nfcWrite() {
+  const mem = nfcTargetMemory;
+  if (!mem) { toast('請先從播放器選擇要綁定的記憶'); return; }
+
+  if (!('NDEFReader' in window)) {
+    // iOS Safari / desktop fallback: show URL to copy
+    const url = `${location.origin}${location.pathname}?m=${mem.id}`;
+    toast('NFC 不支援，已複製連結');
+    try { await navigator.clipboard.writeText(url); } catch(e) {}
+    return;
+  }
+
+  const st = document.getElementById('nfc-write-st');
+  nfcState('scanning');
+  st.style.color = 'rgba(255,255,255,.5)';
+  st.textContent = '靠近標籤以寫入…';
+
+  try {
+    const ndef = new NDEFReader();
+    const url = `${location.origin}${location.pathname}?m=${mem.id}`;
+    await ndef.write({
+      records: [
+        { recordType: 'url',  data: url },
+        { recordType: 'text', data: mem.title, lang: 'zh-TW' }
+      ]
+    });
+    nfcState('found');
+    document.getElementById('nfc-found-title').textContent = mem.title;
+    document.getElementById('nfc-serial').textContent = '寫入成功 ✓';
+    document.getElementById('nfc-write-st').textContent = '標籤已綁定：' + mem.title;
+    document.getElementById('nfc-write-st').style.color = '#86efac';
+    toast('NFC 標籤寫入成功！');
+  } catch(e) {
+    document.getElementById('nfc-err-title').textContent = '寫入失敗';
+    document.getElementById('nfc-err-msg').textContent = e.name === 'NotAllowedError'
+      ? '請允許 NFC 存取權限' : e.message;
+    nfcState('error');
+  }
+}
+
+async function nfcScan() {
+  if (!('NDEFReader' in window)) {
+    document.getElementById('nfc-err-title').textContent = 'NFC 不支援';
+    document.getElementById('nfc-err-msg').textContent = '請使用 Android Chrome 89+\n並確認 NFC 已在設定中開啟。';
+    nfcState('error'); return;
+  }
+  nfcState('scanning');
+  try {
+    const ndef = new NDEFReader();
+    const ctrl = new AbortController();
+    window._nc = ctrl;
+    await ndef.scan({ signal: ctrl.signal });
+    toast('NFC 掃描中…請靠近標籤');
+
+    ndef.addEventListener('reading', async ({ message, serialNumber }) => {
+      let url = null, title = '未知記憶';
+      for (const r of message.records) {
+        if (r.recordType === 'url')  url   = new TextDecoder().decode(r.data);
+        if (r.recordType === 'text') title = new TextDecoder(r.encoding ?? 'utf-8').decode(r.data);
+      }
+      document.getElementById('nfc-found-title').textContent = title;
+      document.getElementById('nfc-serial').textContent = '序號 ' + (serialNumber || 'N/A');
+      nfcState('found');
+
+      // If URL contains our memory ID, load it
+      if (url) {
+        try {
+          const u = new URL(url);
+          const mid = u.searchParams.get('m');
+          const mem = mid ? memories.find(m => m.id === mid) : null;
+          if (mem) {
+            document.getElementById('nfc-play-btn').onclick = () => openPlayer(mem);
+          } else {
+            document.getElementById('nfc-play-btn').onclick = () => toast('此記憶不在本裝置中');
+          }
+        } catch(e) {}
+      }
+    });
+
+    ndef.addEventListener('readingerror', () => {
+      document.getElementById('nfc-err-title').textContent = '讀取失敗';
+      document.getElementById('nfc-err-msg').textContent = '無法解析標籤，請再試一次。';
+      nfcState('error');
+    });
+  } catch(e) {
+    if (e.name === 'AbortError') return;
+    document.getElementById('nfc-err-title').textContent =
+      e.name === 'NotAllowedError' ? '需要 NFC 權限' :
+      e.name === 'NotSupportedError' ? 'NFC 未啟用' : '掃描失敗';
+    document.getElementById('nfc-err-msg').textContent =
+      e.name === 'NotAllowedError' ? '請允許 NFC 存取後重試。' :
+      e.name === 'NotSupportedError' ? '請到手機設定中開啟 NFC。' : e.message;
+    nfcState('error');
+  }
+}
+
+/* ═════════════════════════════════════════════════════
+   UTILS
+   ═════════════════════════════════════════════════════ */
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+async function clearAllData() {
+  if (!confirm('確定要刪除所有錄音資料？此操作無法復原。')) return;
+  const all = await dbGetAll('memories');
+  for (const m of all) await dbDel('memories', m.id);
+  memories = [];
+  renderAll();
+  toast('已清除所有記憶');
+}
+
+/* ═════════════════════════════════════════════════════
+   SERVICE WORKER
+   ═════════════════════════════════════════════════════ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
+      .then(r => console.log('[SW]', r.scope))
+      .catch(e => console.warn('[SW]', e));
+  });
+}
+
+/* ═════════════════════════════════════════════════════
+   iOS INSTALL PROMPT
+   ═════════════════════════════════════════════════════ */
+(function(){
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  if (isIOS && !isStandalone && !sessionStorage.getItem('ios-prompt')) {
+    sessionStorage.setItem('ios-prompt', '1');
+    setTimeout(() => {
+      const el = document.getElementById('ios-prompt');
+      if (el) el.style.transform = 'translate(-50%, 0)';
+    }, 3000);
+  }
+})();
+function dismissIOS() {
+  const el = document.getElementById('ios-prompt');
+  if (el) el.style.transform = 'translate(-50%, 130%)';
+}
+
+/* Android install */
+let _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); _deferredPrompt = e;
+  setTimeout(() => {
+    const el = document.getElementById('android-prompt');
+    if (el) el.style.transform = 'translate(-50%, 0)';
+  }, 3000);
+});
+function installAndroid() {
+  if (!_deferredPrompt) return;
+  _deferredPrompt.prompt();
+  _deferredPrompt.userChoice.then(() => { _deferredPrompt = null; dismissAndroid(); });
+}
+function dismissAndroid() {
+  const el = document.getElementById('android-prompt');
+  if (el) el.style.transform = 'translate(-50%, 130%)';
+}
+
+/* ═════════════════════════════════════════════════════
+   BOOT
+   ═════════════════════════════════════════════════════ */
+init();
+</script>
+
+<!-- iOS 安裝提示 -->
+<div id="ios-prompt" style="position:fixed;bottom:0;left:50%;transform:translate(-50%,130%);width:min(390px,100vw);z-index:9999;transition:transform .4s cubic-bezier(.4,0,.2,1);padding:0 12px max(16px,env(safe-area-inset-bottom)) 12px;">
+  <div style="background:#1C1C1E;border-radius:24px;padding:18px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#7A5CFA,#B490FF);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-wifi" style="color:#fff;font-size:18px;transform:rotate(90deg);display:block;"></i></div>
+        <div><p style="font-size:14px;font-weight:700;color:#fff;">加入主畫面</p><p style="font-size:11px;color:rgba(255,255,255,.4);">全螢幕 App 體驗</p></div>
+      </div>
+      <button onclick="dismissIOS()" style="background:rgba(255,255,255,.12);border:none;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><i class="fa-solid fa-xmark" style="color:rgba(255,255,255,.6);font-size:12px;"></i></button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;"><span style="width:24px;height:24px;background:rgba(122,92,250,.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#B490FF;flex-shrink:0;">1</span><p style="font-size:13px;font-weight:600;color:#fff;flex:1;">點底部「分享」按鈕</p><svg width="18" height="22" viewBox="0 0 22 26" fill="none"><path d="M11 1v16M11 1L7 5M11 1l4 4" stroke="#7A5CFA" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13v9c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2v-9" stroke="#7A5CFA" stroke-width="2.2" stroke-linecap="round"/></svg></div>
+      <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;"><span style="width:24px;height:24px;background:rgba(122,92,250,.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#B490FF;flex-shrink:0;">2</span><p style="font-size:13px;font-weight:600;color:#fff;flex:1;">選擇「加入主畫面」</p><i class="fa-regular fa-square-plus" style="color:#7A5CFA;font-size:18px;"></i></div>
+      <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;"><span style="width:24px;height:24px;background:rgba(122,92,250,.3);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#B490FF;flex-shrink:0;">3</span><p style="font-size:13px;font-weight:600;color:#fff;flex:1;">點右上角「新增」</p><i class="fa-solid fa-check-circle" style="color:#34d399;font-size:18px;"></i></div>
+    </div>
+    <div style="text-align:center;margin-top:12px;"><i class="fa-solid fa-chevron-down" style="color:rgba(122,92,250,.7);font-size:14px;animation:bounce .8s ease-in-out infinite alternate;"></i></div>
+  </div>
+</div>
+
+<!-- Android 安裝提示 -->
+<div id="android-prompt" style="position:fixed;bottom:0;left:50%;transform:translate(-50%,130%);width:min(390px,100vw);z-index:9999;transition:transform .4s cubic-bezier(.4,0,.2,1);padding:0 12px 12px;">
+  <div style="background:#fff;border-radius:24px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 -4px 40px rgba(0,0,0,.15);">
+    <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#7A5CFA,#B490FF);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid fa-wifi" style="color:#fff;font-size:20px;transform:rotate(90deg);display:block;"></i></div>
+    <div style="flex:1;min-width:0;"><p style="font-size:14px;font-weight:700;color:#111;margin-bottom:2px;">安裝 TaroEcho</p><p style="font-size:12px;color:#94A3B8;">加入主畫面以全螢幕使用</p></div>
+    <div style="display:flex;gap:8px;flex-shrink:0;">
+      <button onclick="dismissAndroid()" style="background:#F1F0FF;border:none;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:600;color:#7A5CFA;cursor:pointer;font-family:inherit;">稍後</button>
+      <button onclick="installAndroid()" style="background:#7A5CFA;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;">安裝</button>
+    </div>
+  </div>
+</div>
+
+<style>@keyframes bounce{0%{transform:translateY(0)}100%{transform:translateY(6px)}}</style>
+</body>
+</html>
