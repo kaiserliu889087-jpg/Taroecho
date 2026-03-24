@@ -90,7 +90,7 @@
       </div>
       <h1 style="font-size:68px;font-weight:900;color:#111;line-height:1;letter-spacing:-3px;margin-bottom:10px;">Taro<br><span class="grad">Echo</span></h1>
       <p style="color:#94A3B8;font-size:17px;font-weight:600;line-height:1.6;margin-bottom:44px;">讓每一塊記憶，<br>都有專屬的聲音。</p>
-      <button onclick="go('vault')" class="tap" style="width:100%;background:#111;color:#fff;border:none;border-radius:24px;padding:20px 28px;display:flex;justify-content:space-between;align-items:center;font-size:18px;font-weight:700;box-shadow:0 16px 36px rgba(0,0,0,.18);">
+      <button id="start-btn" type="button" onclick="go('vault')" class="tap" style="width:100%;background:#111;color:#fff;border:none;border-radius:24px;padding:20px 28px;display:flex;justify-content:space-between;align-items:center;font-size:18px;font-weight:700;box-shadow:0 16px 36px rgba(0,0,0,.18);">
         <span>開始聆聽</span>
         <div style="width:42px;height:42px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-arrow-right" style="color:#111;font-size:15px;"></i></div>
       </button>
@@ -1351,13 +1351,19 @@ if ('serviceWorker' in navigator) {
     sessionStorage.setItem('ios-prompt', '1');
     setTimeout(() => {
       const el = document.getElementById('ios-prompt');
-      if (el) el.style.transform = 'translate(-50%, 0)';
+      if (el) {
+        el.style.transform = 'translate(-50%, 0)';
+        el.style.pointerEvents = 'auto';
+      }
     }, 3000);
   }
 })();
 function dismissIOS() {
   const el = document.getElementById('ios-prompt');
-  if (el) el.style.transform = 'translate(-50%, 130%)';
+  if (el) {
+    el.style.transform = 'translate(-50%, 130%)';
+    el.style.pointerEvents = 'none';
+  }
 }
 
 /* Android install */
@@ -1366,7 +1372,10 @@ window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); _deferredPrompt = e;
   setTimeout(() => {
     const el = document.getElementById('android-prompt');
-    if (el) el.style.transform = 'translate(-50%, 0)';
+    if (el) {
+      el.style.transform = 'translate(-50%, 0)';
+      el.style.pointerEvents = 'auto';
+    }
   }, 3000);
 });
 function installAndroid() {
@@ -1376,17 +1385,32 @@ function installAndroid() {
 }
 function dismissAndroid() {
   const el = document.getElementById('android-prompt');
-  if (el) el.style.transform = 'translate(-50%, 130%)';
+  if (el) {
+    el.style.transform = 'translate(-50%, 130%)';
+    el.style.pointerEvents = 'none';
+  }
+}
+
+function wireStartButton() {
+  const btn = document.getElementById('start-btn');
+  if (!btn) return;
+  const onStart = e => {
+    e.preventDefault();
+    go('vault');
+  };
+  btn.addEventListener('touchend', onStart, { passive: false });
+  btn.addEventListener('click', onStart);
 }
 
 /* ═════════════════════════════════════════════════════
    BOOT
    ═════════════════════════════════════════════════════ */
 init();
+wireStartButton();
 </script>
 
 <!-- iOS 安裝提示 -->
-<div id="ios-prompt" style="position:fixed;bottom:0;left:50%;transform:translate(-50%,130%);width:min(390px,100vw);z-index:9999;transition:transform .4s cubic-bezier(.4,0,.2,1);padding:0 12px max(16px,env(safe-area-inset-bottom)) 12px;">
+<div id="ios-prompt" style="position:fixed;bottom:0;left:50%;transform:translate(-50%,130%);pointer-events:none;width:min(390px,100vw);z-index:9999;transition:transform .4s cubic-bezier(.4,0,.2,1);padding:0 12px max(16px,env(safe-area-inset-bottom)) 12px;">
   <div style="background:#1C1C1E;border-radius:24px;padding:18px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:10px;">
@@ -1405,7 +1429,7 @@ init();
 </div>
 
 <!-- Android 安裝提示 -->
-<div id="android-prompt" style="position:fixed;bottom:0;left:50%;transform:translate(-50%,130%);width:min(390px,100vw);z-index:9999;transition:transform .4s cubic-bezier(.4,0,.2,1);padding:0 12px 12px;">
+<div id="android-prompt" style="position:fixed;bottom:0;left:50%;transform:translate(-50%,130%);pointer-events:none;width:min(390px,100vw);z-index:9999;transition:transform .4s cubic-bezier(.4,0,.2,1);padding:0 12px 12px;">
   <div style="background:#fff;border-radius:24px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 -4px 40px rgba(0,0,0,.15);">
     <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#7A5CFA,#B490FF);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fa-solid fa-wifi" style="color:#fff;font-size:20px;transform:rotate(90deg);display:block;"></i></div>
     <div style="flex:1;min-width:0;"><p style="font-size:14px;font-weight:700;color:#111;margin-bottom:2px;">安裝 TaroEcho</p><p style="font-size:12px;color:#94A3B8;">加入主畫面以全螢幕使用</p></div>
