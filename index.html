@@ -1324,7 +1324,19 @@ async function clearAllData() {
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then(r => console.log('[SW]', r.scope))
+      .then(r => {
+        console.log('[SW]', r.scope);
+        r.update();
+        r.addEventListener('updatefound', () => {
+          const installing = r.installing;
+          if (!installing) return;
+          installing.addEventListener('statechange', () => {
+            if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+              toast('已更新到新版，請重新整理一次');
+            }
+          });
+        });
+      })
       .catch(e => console.warn('[SW]', e));
   });
 }

@@ -3,8 +3,8 @@
    策略：Cache-First（核心殼層） + Network-First（圖片/外部資源）
    ════════════════════════════════════════════════════════════ */
 
-const CACHE_NAME   = 'taroecho-v2';
-const RUNTIME_CACHE = 'taroecho-runtime-v2';
+const CACHE_NAME   = 'taroecho-v3';
+const RUNTIME_CACHE = 'taroecho-runtime-v3';
 
 /* 安裝時預快取的核心資源（App Shell） */
 const PRECACHE_URLS = [
@@ -48,28 +48,35 @@ self.addEventListener('fetch', event => {
   /* 1. 非 GET 請求：直接放行，不快取 */
   if (request.method !== 'GET') return;
 
-  /* 2. App Shell（同源 HTML / JS / CSS / manifest）
-        策略：Cache-First → 離線也能開啟 App */
+    /* 2. 導覽請求（HTML）
+      策略：Network-First，避免手機長期吃到舊版 index.html */
+    if (request.mode === 'navigate' || request.destination === 'document') {
+      event.respondWith(networkFirst(request));
+      return;
+    }
+
+    /* 3. App Shell（同源 JS / CSS / manifest）
+      策略：Cache-First → 離線也能開啟 App */
   if (url.origin === self.location.origin) {
     event.respondWith(cacheFirst(request));
     return;
   }
 
-  /* 3. Google Fonts CSS（跨域）
+    /* 4. Google Fonts CSS（跨域）
         策略：Stale-While-Revalidate → 快取回應同時背景更新 */
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(staleWhileRevalidate(request));
     return;
   }
 
-  /* 4. Font Awesome CDN
+  /* 5. Font Awesome CDN
         策略：Cache-First，版本固定不需頻繁更新 */
   if (url.hostname === 'cdnjs.cloudflare.com') {
     event.respondWith(cacheFirst(request));
     return;
   }
 
-  /* 5. Unsplash 圖片 / 其他外部資源
+  /* 6. Unsplash 圖片 / 其他外部資源
         策略：Network-First → 有網路用新圖，離線降級顯示快取版 */
   event.respondWith(networkFirst(request));
 });
