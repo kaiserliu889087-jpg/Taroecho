@@ -865,6 +865,15 @@ let recCtx = null, recAnalyser = null, recAnimFrame = null;
 let recTimer = null, recSec = 0, recActive = false;
 
 async function toggleRecording() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('此裝置不支援麥克風錄音');
+    return;
+  }
+  if (typeof MediaRecorder === 'undefined') {
+    toast('此瀏覽器不支援錄音功能（MediaRecorder）');
+    return;
+  }
+
   if (!recActive) {
     // Start
     try {
@@ -874,13 +883,21 @@ async function toggleRecording() {
       return;
     }
 
+    if (recCtx && recCtx.state !== 'closed') {
+      try { await recCtx.close(); } catch (e) {}
+    }
     recCtx = new (window.AudioContext || window.webkitAudioContext)();
     recAnalyser = recCtx.createAnalyser();
     recAnalyser.fftSize = 64;
     const src = recCtx.createMediaStreamSource(recStream);
     src.connect(recAnalyser);
 
-    const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg','audio/mp4']
+    const ua = navigator.userAgent || '';
+    const preferMp4 = /iPhone|iPad|iPod|Safari/i.test(ua) && !/Chrome|CriOS/i.test(ua);
+    const mimeCandidates = preferMp4
+      ? ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg']
+      : ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg', 'audio/mp4'];
+    const mimeType = mimeCandidates
       .find(t => MediaRecorder.isTypeSupported(t)) || '';
     mediaRecorder = new MediaRecorder(recStream, mimeType ? { mimeType } : {});
     audioChunks = [];
@@ -967,12 +984,15 @@ function drawRecWave() {
 async function finishRecording() {
   if (!mediaRecorder || !recActive) return;
 
+  const stopPromise = new Promise(resolve => {
+    mediaRecorder.addEventListener('stop', resolve, { once: true });
+  });
   mediaRecorder.stop();
   recStream.getTracks().forEach(t => t.stop());
   clearInterval(recTimer);
   cancelAnimationFrame(recAnimFrame);
 
-  await new Promise(r => { mediaRecorder.onstop = r; });
+  await stopPromise;
 
   const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
   const audioExt = extFromMime(blob.type || mediaRecorder.mimeType || 'audio/webm');
@@ -1045,6 +1065,11 @@ function stopRec(silent) {
     try { mediaRecorder.stop(); } catch(e) {}
   }
   if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+  if (recCtx && recCtx.state !== 'closed') {
+    try { recCtx.close(); } catch (e) {}
+  }
+  recCtx = null;
+  recAnalyser = null;
   clearInterval(recTimer); cancelAnimationFrame(recAnimFrame);
   recActive = false; recSec = 0; mediaRecorder = null;
 
