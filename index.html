@@ -495,6 +495,28 @@ function renderAll() {
   renderProfile();
 }
 
+function drawBarRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    // Fallback for browsers without CanvasRenderingContext2D.roundRect
+    ctx.rect(x, y, w, h);
+  }
+}
+
+function installRuntimeGuards() {
+  window.addEventListener('error', e => {
+    console.error('[RuntimeError]', e.message, e.error);
+    toast('頁面錯誤：' + (e.message || '未知錯誤'));
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const msg = e?.reason?.message || String(e?.reason || '未知錯誤');
+    console.error('[UnhandledPromiseRejection]', e.reason);
+    toast('執行失敗：' + msg);
+  });
+}
+
 function extFromMime(mime) {
   if (!mime) return 'webm';
   if (mime.includes('mp4')) return 'mp4';
@@ -726,10 +748,9 @@ function drawStaticWave() {
     const pct = h / 100;
     const bh = pct * canvas.height;
     ctx.fillStyle = i < 8 ? 'rgba(122,92,250,.9)' : 'rgba(226,232,240,.9)';
-    ctx.beginPath();
     const x = i * bw + bw * .15;
     const y = (canvas.height - bh) / 2;
-    ctx.roundRect(x, y, bw * .7, bh, 2);
+    drawBarRect(ctx, x, y, bw * .7, bh, 2);
     ctx.fill();
   });
 }
@@ -765,8 +786,7 @@ function drawPlayerWave() {
       const bh = Math.max(4, pct * canvas.height);
       const y = (canvas.height - bh) / 2;
       ctx.fillStyle = `rgba(122,92,250,${.3 + pct * .7})`;
-      ctx.beginPath();
-      ctx.roundRect(i * bw + bw * .1, y, bw * .8, bh, 2);
+      drawBarRect(ctx, i * bw + bw * .1, y, bw * .8, bh, 2);
       ctx.fill();
     });
   }
@@ -973,8 +993,7 @@ function drawRecWave() {
       const bh = Math.max(3, pct * canvas.height);
       const y = (canvas.height - bh) / 2;
       ctx.fillStyle = `rgba(122,92,250,${.4 + pct * .6})`;
-      ctx.beginPath();
-      ctx.roundRect(i * bw + 1, y, Math.max(bw - 2, 1), bh, 2);
+      drawBarRect(ctx, i * bw + 1, y, Math.max(bw - 2, 1), bh, 2);
       ctx.fill();
     });
   }
@@ -1322,7 +1341,25 @@ async function clearAllData() {
    SERVICE WORKER
    ═════════════════════════════════════════════════════ */
 if ('serviceWorker' in navigator) {
+  async function resetStaleServiceWorkerOnce() {
+    const flag = 'taroecho_sw_reset_v1';
+    if (localStorage.getItem(flag)) return;
+    localStorage.setItem(flag, '1');
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter(k => k.startsWith('taroecho-')).map(k => caches.delete(k)));
+      }
+      location.reload();
+    } catch (e) {
+      console.warn('[SW reset]', e);
+    }
+  }
+
   window.addEventListener('load', () => {
+    resetStaleServiceWorkerOnce();
     navigator.serviceWorker.register('./sw.js', { scope: './' })
       .then(r => {
         console.log('[SW]', r.scope);
@@ -1405,6 +1442,7 @@ function wireStartButton() {
 /* ═════════════════════════════════════════════════════
    BOOT
    ═════════════════════════════════════════════════════ */
+installRuntimeGuards();
 init();
 wireStartButton();
 </script>
