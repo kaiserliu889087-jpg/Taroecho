@@ -44,7 +44,7 @@
     .card{background:#fff;border-radius:20px;}
     .shad{box-shadow:0 4px 20px rgba(0,0,0,.07);}
     .shad-t{box-shadow:0 8px 24px rgba(122,92,250,.35);}
-    .tap{cursor:pointer;transition:transform .18s,opacity .18s;}
+    .tap{cursor:pointer;transition:transform .18s,opacity .18s;touch-action:manipulation;}
     .tap:active{transform:scale(.96);opacity:.85;}
 
     .wb{width:4px;border-radius:4px;transform-origin:bottom;animation:wbounce 1.2s ease-in-out infinite alternate;}
@@ -326,6 +326,7 @@ const SUPABASE_KEY = 'sb_publishable_l5rhl2hOWhdoDkAVrN20HA_ty9JevMm';
 let supabase = null;
 let currentUser = null;
 let supabaseInitError = '';
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
 async function initSupabase() {
   try {
@@ -756,6 +757,7 @@ function drawStaticWave() {
 }
 
 function setupAudioViz() {
+  if (IS_IOS) return;
   try {
     if (!playerCtx) playerCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (playerAnalyser) { playerAnalyser.disconnect(); }
@@ -768,6 +770,7 @@ function setupAudioViz() {
 }
 
 function drawPlayerWave() {
+  if (IS_IOS) return;
   if (!playerAnalyser) return;
   const canvas = document.getElementById('player-canvas');
   if (!canvas) return;
@@ -903,14 +906,16 @@ async function toggleRecording() {
       return;
     }
 
-    if (recCtx && recCtx.state !== 'closed') {
-      try { await recCtx.close(); } catch (e) {}
+    if (!IS_IOS) {
+      if (recCtx && recCtx.state !== 'closed') {
+        try { await recCtx.close(); } catch (e) {}
+      }
+      recCtx = new (window.AudioContext || window.webkitAudioContext)();
+      recAnalyser = recCtx.createAnalyser();
+      recAnalyser.fftSize = 64;
+      const src = recCtx.createMediaStreamSource(recStream);
+      src.connect(recAnalyser);
     }
-    recCtx = new (window.AudioContext || window.webkitAudioContext)();
-    recAnalyser = recCtx.createAnalyser();
-    recAnalyser.fftSize = 64;
-    const src = recCtx.createMediaStreamSource(recStream);
-    src.connect(recAnalyser);
 
     const ua = navigator.userAgent || '';
     const preferMp4 = /iPhone|iPad|iPod|Safari/i.test(ua) && !/Chrome|CriOS/i.test(ua);
@@ -933,8 +938,8 @@ async function toggleRecording() {
     btn.style.background = 'linear-gradient(135deg,#ef4444,#f97316)';
     btn.innerHTML = '<i class="fa-solid fa-stop" style="color:#fff;font-size:28px;"></i>';
 
-    document.getElementById('rec-canvas').style.opacity = '1';
-    drawRecWave();
+    document.getElementById('rec-canvas').style.opacity = IS_IOS ? '0' : '1';
+    if (!IS_IOS) drawRecWave();
 
     recSec = 0;
     recTimer = setInterval(() => {
@@ -963,8 +968,8 @@ async function toggleRecording() {
       btn.innerHTML = '<i class="fa-solid fa-microphone" style="color:#fff;font-size:32px;"></i>';
     } else if (mediaRecorder.state === 'paused') {
       mediaRecorder.resume();
-      document.getElementById('rec-canvas').style.opacity = '1';
-      drawRecWave();
+      document.getElementById('rec-canvas').style.opacity = IS_IOS ? '0' : '1';
+      if (!IS_IOS) drawRecWave();
       const btn = document.getElementById('mic-btn');
       btn.style.background = 'linear-gradient(135deg,#ef4444,#f97316)';
       btn.innerHTML = '<i class="fa-solid fa-stop" style="color:#fff;font-size:28px;"></i>';
@@ -979,6 +984,7 @@ async function toggleRecording() {
 }
 
 function drawRecWave() {
+  if (IS_IOS) return;
   if (!recAnalyser) return;
   const canvas = document.getElementById('rec-canvas');
   const ctx = canvas.getContext('2d');
@@ -1341,41 +1347,56 @@ async function clearAllData() {
    SERVICE WORKER
    ═════════════════════════════════════════════════════ */
 if ('serviceWorker' in navigator) {
-  async function resetStaleServiceWorkerOnce() {
-    const flag = 'taroecho_sw_reset_v1';
-    if (localStorage.getItem(flag)) return;
-    localStorage.setItem(flag, '1');
-    try {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map(r => r.unregister()));
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.filter(k => k.startsWith('taroecho-')).map(k => caches.delete(k)));
+  if (IS_IOS) {
+    window.addEventListener('load', async () => {
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter(k => k.startsWith('taroecho-')).map(k => caches.delete(k)));
+        }
+      } catch (e) {
+        console.warn('[SW iOS cleanup]', e);
       }
-      location.reload();
-    } catch (e) {
-      console.warn('[SW reset]', e);
+    });
+  } else {
+    async function resetStaleServiceWorkerOnce() {
+      const flag = 'taroecho_sw_reset_v1';
+      if (localStorage.getItem(flag)) return;
+      localStorage.setItem(flag, '1');
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(r => r.unregister()));
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.filter(k => k.startsWith('taroecho-')).map(k => caches.delete(k)));
+        }
+        location.reload();
+      } catch (e) {
+        console.warn('[SW reset]', e);
+      }
     }
-  }
 
-  window.addEventListener('load', () => {
-    resetStaleServiceWorkerOnce();
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then(r => {
-        console.log('[SW]', r.scope);
-        r.update();
-        r.addEventListener('updatefound', () => {
-          const installing = r.installing;
-          if (!installing) return;
-          installing.addEventListener('statechange', () => {
-            if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-              toast('已更新到新版，請重新整理一次');
-            }
+    window.addEventListener('load', () => {
+      resetStaleServiceWorkerOnce();
+      navigator.serviceWorker.register('./sw.js', { scope: './' })
+        .then(r => {
+          console.log('[SW]', r.scope);
+          r.update();
+          r.addEventListener('updatefound', () => {
+            const installing = r.installing;
+            if (!installing) return;
+            installing.addEventListener('statechange', () => {
+              if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                toast('已更新到新版，請重新整理一次');
+              }
+            });
           });
-        });
-      })
-      .catch(e => console.warn('[SW]', e));
-  });
+        })
+        .catch(e => console.warn('[SW]', e));
+    });
+  }
 }
 
 /* ═════════════════════════════════════════════════════
