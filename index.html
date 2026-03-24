@@ -14,6 +14,7 @@
   <link rel="apple-touch-icon" href="https://placehold.co/180x180/7A5CFA/ffffff?text=芋">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root { --taro:#7A5CFA; --taro-l:#B490FF; }
     *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
@@ -318,7 +319,31 @@
 
 <script>
 /* ═════════════════════════════════════════════════════
-   DATABASE — IndexedDB
+   SUPABASE CONFIG
+   ═════════════════════════════════════════════════════ */
+const SUPABASE_URL = 'YOUR_PROJECT_URL';      // Replace with your Supabase URL
+const SUPABASE_KEY = 'YOUR_ANON_KEY';         // Replace with your anon key
+let supabase = null;
+let currentUser = null;
+
+async function initSupabase() {
+  try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // Attempt anonymous sign-in
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) throw error;
+    currentUser = data.user;
+    console.log('[Supabase] Signed in as:', currentUser.id);
+    return true;
+  } catch (err) {
+    console.warn('[Supabase] Init failed:', err.message);
+    supabase = null;
+    return false;
+  }
+}
+
+/* ═════════════════════════════════════════════════════
+   DATABASE — IndexedDB (Local Cache)
    ═════════════════════════════════════════════════════ */
 let _db = null;
 
@@ -379,9 +404,54 @@ function goBack() {
    INIT
    ═════════════════════════════════════════════════════ */
 async function init() {
+  // Initialize Supabase
+  const sbOk = await initSupabase();
+  
+  // Load local memories
   await dbOpen();
   loadMembers();
-  memories = await dbGetAll('memories');
+  
+  // Load both local and cloud memories
+  const local = await dbGetAll('memories');
+  
+  if (sbOk && supabase && currentUser) {
+    try {
+      // Fetch cloud memories
+      const { data: cloudMems, error } = await supabase
+        .from('memories')
+        .select('*')
+        .or(`user_id.eq.${currentUser.id},privacy.eq.public`);
+      
+      if (!error && cloudMems) {
+        // Merge cloud memories (prefer cloud version if exists)
+        const cloudMap = {};
+        cloudMems.forEach(cm => { cloudMap[cm.id] = cm; });
+        
+        // Create merged list: local cache + new cloud items
+        const merged = {};
+        local.forEach(m => { merged[m.id] = m; });
+        cloudMems.forEach(cm => {
+          if (!merged[cm.id] || cm.updated_at > merged[cm.id].recordedAt) {
+            merged[cm.id] = {
+              ...cm,
+              recordedAt: cm.recorded_at || cm.created_at,
+              cloudId: cm.id,
+              isCloud: true
+            };
+          }
+        });
+        memories = Object.values(merged);
+      } else {
+        memories = local;
+      }
+    } catch (err) {
+      console.warn('[Init] Cloud fetch failed:', err.message);
+      memories = local;
+    }
+  } else {
+    memories = local;
+  }
+  
   memories.sort((a, b) => b.recordedAt - a.recordedAt);
   renderAll();
 
@@ -389,10 +459,22 @@ async function init() {
   const params = new URLSearchParams(location.search);
   const mid = params.get('m');
   if (mid) {
-    const mem = memories.find(m => m.id === mid);
+    // Try local first, then cloud
+    let mem = memories.find(m => m.id === mid || m.cloudId === mid);
+    if (!mem && sbOk && supabase) {
+      try {
+        const { data: cloudMem } = await supabase
+          .from('memories')
+          .select('*')
+          .eq('id', mid)
+          .single();
+        if (cloudMem && (cloudMem.privacy === 'public' || cloudMem.user_id === currentUser?.id)) {
+          mem = { ...cloudMem, recordedAt: cloudMem.recorded_at, cloudId: cloudMem.id, isCloud: true };
+        }
+      } catch (err) { /* ignore */ }
+    }
     if (mem) { openPlayer(mem); return; }
-    // Not in local DB — show friendly message
-    toast('此標籤的記憶不在本裝置中');
+    toast('找不到該記憶或無權限');
   }
 }
 
@@ -556,20 +638,50 @@ function openPlayer(mem) {
   cancelAnimationFrame(playerAnimFrame);
   drawStaticWave();
 
-  if (mem.audioBlob) {
-    playerBlobUrl = URL.createObjectURL(mem.audioBlob);
-    audioEl.src = playerBlobUrl;
-    audioEl.load();
-    setupAudioViz();
-  } else {
-    // Demo memory — no audio, simulate
-    document.getElementById('prog-dur').textContent = fmtDur(mem.duration || 0);
-  }
+  // Load audio from local blob or cloud
+  (async () => {
+    if (mem.audioBlob) {
+      playerBlobUrl = URL.createObjectURL(mem.audioBlob);
+      audioEl.src = playerBlobUrl;
+      audioEl.load();
+      setupAudioViz();
+    } else if (mem.isCloud && mem.id && supabase && (mem.privacy === 'public' || mem.user_id === currentUser?.id)) {
+      try {
+        // Fetch from Supabase Storage
+        const userId = mem.user_id || currentUser.id;
+        const audioPath = `memories/${userId}/${mem.id}.webm`;
+        const { data: audioData, error } = await supabase.storage
+          .from('memories')
+          .download(audioPath);
+        
+        if (error) throw error;
+        playerBlobUrl = URL.createObjectURL(audioData);
+        audioEl.src = playerBlobUrl;
+        audioEl.load();
+        setupAudioViz();
+      } catch (err) {
+        console.warn('[Player] Cloud audio fetch failed:', err.message);
+        toast('無法載入該記憶的音檔');
+      }
+    } else {
+      // Demo memory — no audio, simulate
+      document.getElementById('prog-dur').textContent = fmtDur(mem.duration || 0);
+    }
+  })();
 
-  // Increment listens
-  mem.listens = (mem.listens || 0) + 1;
-  dbPut('memories', mem);
-  renderProfile();
+  // Increment listens in cloud
+  if (mem.isCloud && supabase && currentUser && mem.user_id) {
+    supabase
+      .from('memories')
+      .update({ listens: (mem.listens || 0) + 1 })
+      .eq('id', mem.id)
+      .then(() => { mem.listens = (mem.listens || 0) + 1; renderProfile(); })
+      .catch(err => console.warn('[Listens] Update failed:', err.message));
+  } else {
+    mem.listens = (mem.listens || 0) + 1;
+    dbPut('memories', mem);
+    renderProfile();
+  }
 
   go('player');
 }
@@ -692,10 +804,24 @@ function setPrivacy(v) {
   }
   if (currentMemory) {
     currentMemory.privacy = v;
-    dbPut('memories', currentMemory).then(() => {
-      memories = memories.map(m => m.id === currentMemory.id ? currentMemory : m);
-      renderAll();
-    });
+    
+    // Update cloud if available
+    if (currentMemory.isCloud && supabase && currentMemory.id) {
+      supabase
+        .from('memories')
+        .update({ privacy: v })
+        .eq('id', currentMemory.id)
+        .then(() => {
+          memories = memories.map(m => m.id === currentMemory.id ? currentMemory : m);
+          renderAll();
+        })
+        .catch(err => console.warn('[Privacy] Update failed:', err.message));
+    } else {
+      dbPut('memories', currentMemory).then(() => {
+        memories = memories.map(m => m.id === currentMemory.id ? currentMemory : m);
+        renderAll();
+      });
+    }
   }
 }
 
@@ -820,6 +946,7 @@ async function finishRecording() {
   const title = document.getElementById('rec-title').value.trim() || `記憶 ${new Date().toLocaleDateString('zh-TW')}`;
   const id = 'mem-' + Date.now();
 
+  // Save to local storage first
   const mem = {
     id, title,
     privacy: 'private',
@@ -830,11 +957,49 @@ async function finishRecording() {
   };
 
   await dbPut('memories', mem);
+
+  // Try to upload to Supabase
+  if (supabase && currentUser) {
+    try {
+      toast('上傳錄音到雲端...');
+      
+      // Upload audio blob to storage
+      const audioPath = `memories/${currentUser.id}/${id}.webm`;
+      const { error: uploadErr } = await supabase.storage
+        .from('memories')
+        .upload(audioPath, blob, { contentType: 'audio/webm' });
+      
+      if (uploadErr) throw uploadErr;
+
+      // Create memory record in database
+      const { data: dbData, error: dbErr } = await supabase
+        .from('memories')
+        .insert([{
+          id: id,
+          user_id: currentUser.id,
+          title: title,
+          privacy: 'private',
+          duration: recSec,
+          recorded_at: new Date().toISOString()
+        }])
+        .select('id')
+        .single();
+
+      if (dbErr) throw dbErr;
+      
+      mem.cloudId = dbData?.id;
+      mem.isCloud = true;
+      toast('已上傳到雲端！');
+    } catch (err) {
+      console.warn('[Upload] Failed:', err.message);
+      toast('本地保存成功，但雲端上傳失敗');
+    }
+  }
+
   memories.unshift(mem);
   renderAll();
 
   stopRec(true);
-  toast('錄音已儲存！');
   openPlayer(mem);
 }
 
@@ -960,7 +1125,8 @@ async function nfcWrite() {
 
   if (!('NDEFReader' in window)) {
     // iOS Safari / desktop fallback: show URL to copy
-    const url = `${location.origin}${location.pathname}?m=${mem.id}`;
+    const memId = mem.cloudId || mem.id;
+    const url = `${location.origin}${location.pathname}?m=${memId}`;
     toast('NFC 不支援，已複製連結');
     try { await navigator.clipboard.writeText(url); } catch(e) {}
     return;
@@ -973,7 +1139,9 @@ async function nfcWrite() {
 
   try {
     const ndef = new NDEFReader();
-    const url = `${location.origin}${location.pathname}?m=${mem.id}`;
+    // Use cloud ID if available (better for cross-device sharing)
+    const memId = mem.cloudId || mem.id;
+    const url = `${location.origin}${location.pathname}?m=${memId}`;
     await ndef.write({
       records: [
         { recordType: 'url',  data: url },
@@ -1023,11 +1191,28 @@ async function nfcScan() {
         try {
           const u = new URL(url);
           const mid = u.searchParams.get('m');
-          const mem = mid ? memories.find(m => m.id === mid) : null;
+          
+          // Try local first
+          let mem = mid ? memories.find(m => m.id === mid || m.cloudId === mid) : null;
+          
+          // If not found locally and Supabase is available, try cloud
+          if (!mem && mid && supabase) {
+            try {
+              const { data: cloudMem } = await supabase
+                .from('memories')
+                .select('*')
+                .eq('id', mid)
+                .single();
+              if (cloudMem && (cloudMem.privacy === 'public' || cloudMem.user_id === currentUser?.id)) {
+                mem = { ...cloudMem, recordedAt: cloudMem.recorded_at, cloudId: cloudMem.id, isCloud: true };
+              }
+            } catch (err) { /* ignore */ }
+          }
+          
           if (mem) {
             document.getElementById('nfc-play-btn').onclick = () => openPlayer(mem);
           } else {
-            document.getElementById('nfc-play-btn').onclick = () => toast('此記憶不在本裝置中');
+            document.getElementById('nfc-play-btn').onclick = () => toast('此記憶不在本裝置中或無權限');
           }
         } catch(e) {}
       }
