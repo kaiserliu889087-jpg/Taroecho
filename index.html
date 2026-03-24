@@ -325,6 +325,7 @@ const SUPABASE_URL = 'https://axbupbcobkiqdgqvvtsl.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_l5rhl2hOWhdoDkAVrN20HA_ty9JevMm';
 let supabase = null;
 let currentUser = null;
+let supabaseInitError = '';
 
 async function initSupabase() {
   try {
@@ -333,10 +334,12 @@ async function initSupabase() {
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error) throw error;
     currentUser = data.user;
+    supabaseInitError = '';
     console.log('[Supabase] Signed in as:', currentUser.id);
     return true;
   } catch (err) {
-    console.warn('[Supabase] Init failed:', err.message);
+    supabaseInitError = err?.message || 'Unknown error';
+    console.warn('[Supabase] Init failed:', supabaseInitError);
     supabase = null;
     return false;
   }
@@ -406,6 +409,11 @@ function goBack() {
 async function init() {
   // Initialize Supabase
   const sbOk = await initSupabase();
+  if (!sbOk) {
+    setTimeout(() => {
+      toast('雲端未連線，僅本機模式：' + supabaseInitError);
+    }, 600);
+  }
   
   // Load local memories
   await dbOpen();
@@ -994,6 +1002,8 @@ async function finishRecording() {
       console.warn('[Upload] Failed:', err.message);
       toast('本地保存成功，但雲端上傳失敗');
     }
+  } else {
+    toast('已儲存到本機（雲端未連線）');
   }
 
   memories.unshift(mem);
