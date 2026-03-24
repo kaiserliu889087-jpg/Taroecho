@@ -495,6 +495,14 @@ function renderAll() {
   renderProfile();
 }
 
+function extFromMime(mime) {
+  if (!mime) return 'webm';
+  if (mime.includes('mp4')) return 'mp4';
+  if (mime.includes('ogg')) return 'ogg';
+  if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
+  return 'webm';
+}
+
 function fmtDur(sec) {
   const s = Math.floor(sec || 0);
   return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
@@ -653,16 +661,27 @@ function openPlayer(mem) {
       audioEl.src = playerBlobUrl;
       audioEl.load();
       setupAudioViz();
-    } else if (mem.isCloud && mem.id && supabase && (mem.privacy === 'public' || mem.user_id === currentUser?.id)) {
+    } else if (mem.isCloud && (mem.cloudId || mem.id) && supabase && (mem.privacy === 'public' || mem.user_id === currentUser?.id)) {
       try {
-        // Fetch from Supabase Storage
+        // Fetch from Supabase Storage (try known extensions)
         const userId = mem.user_id || currentUser.id;
-        const audioPath = `memories/${userId}/${mem.id}.webm`;
-        const { data: audioData, error } = await supabase.storage
-          .from('memories')
-          .download(audioPath);
-        
-        if (error) throw error;
+        const cloudMemId = mem.cloudId || mem.id;
+        const tryExts = Array.from(new Set([mem.audioExt, 'webm', 'mp4', 'ogg', 'mp3'].filter(Boolean)));
+        let audioData = null;
+        let lastErr = null;
+
+        for (const ext of tryExts) {
+          const audioPath = `memories/${userId}/${cloudMemId}.${ext}`;
+          const { data, error } = await supabase.storage.from('memories').download(audioPath);
+          if (!error && data) {
+            mem.audioExt = ext;
+            audioData = data;
+            break;
+          }
+          lastErr = error;
+        }
+
+        if (!audioData) throw (lastErr || new Error('audio file not found'));
         playerBlobUrl = URL.createObjectURL(audioData);
         audioEl.src = playerBlobUrl;
         audioEl.load();
@@ -678,11 +697,12 @@ function openPlayer(mem) {
   })();
 
   // Increment listens in cloud
-  if (mem.isCloud && supabase && currentUser && mem.user_id) {
+  if (mem.isCloud && supabase && currentUser && mem.user_id === currentUser.id) {
+    const cloudMemId = mem.cloudId || mem.id;
     supabase
       .from('memories')
       .update({ listens: (mem.listens || 0) + 1 })
-      .eq('id', mem.id)
+      .eq('id', cloudMemId)
       .then(() => { mem.listens = (mem.listens || 0) + 1; renderProfile(); })
       .catch(err => console.warn('[Listens] Update failed:', err.message));
   } else {
@@ -774,13 +794,16 @@ audioEl.addEventListener('durationchange', () => {
 
 function togglePlay() {
   if (!currentMemory) return;
-  if (!currentMemory.audioBlob) { toast('此為示範記憶，無音訊檔案'); return; }
+  if (!audioEl.src) { toast('音檔載入中或不存在'); return; }
   if (playerCtx && playerCtx.state === 'suspended') playerCtx.resume();
   if (audioEl.paused) {
-    audioEl.play();
-    document.getElementById('play-btn').querySelector('i').className = 'fa-solid fa-pause';
-    document.getElementById('play-btn').querySelector('i').style.paddingLeft = '0';
-    drawPlayerWave();
+    audioEl.play().then(() => {
+      document.getElementById('play-btn').querySelector('i').className = 'fa-solid fa-pause';
+      document.getElementById('play-btn').querySelector('i').style.paddingLeft = '0';
+      drawPlayerWave();
+    }).catch(err => {
+      toast('播放失敗：' + (err.message || '請稍後再試'));
+    });
   } else {
     audioEl.pause();
     document.getElementById('play-btn').querySelector('i').className = 'fa-solid fa-play';
@@ -814,11 +837,12 @@ function setPrivacy(v) {
     currentMemory.privacy = v;
     
     // Update cloud if available
-    if (currentMemory.isCloud && supabase && currentMemory.id) {
+    if (currentMemory.isCloud && supabase && (currentMemory.cloudId || currentMemory.id)) {
+      const cloudMemId = currentMemory.cloudId || currentMemory.id;
       supabase
         .from('memories')
         .update({ privacy: v })
-        .eq('id', currentMemory.id)
+        .eq('id', cloudMemId)
         .then(() => {
           memories = memories.map(m => m.id === currentMemory.id ? currentMemory : m);
           renderAll();
@@ -951,6 +975,7 @@ async function finishRecording() {
   await new Promise(r => { mediaRecorder.onstop = r; });
 
   const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+  const audioExt = extFromMime(blob.type || mediaRecorder.mimeType || 'audio/webm');
   const title = document.getElementById('rec-title').value.trim() || `記憶 ${new Date().toLocaleDateString('zh-TW')}`;
   const id = 'mem-' + Date.now();
 
@@ -961,7 +986,8 @@ async function finishRecording() {
     recordedAt: Date.now(),
     duration: recSec,
     listens: 0,
-    audioBlob: blob
+    audioBlob: blob,
+    audioExt
   };
 
   await dbPut('memories', mem);
@@ -970,37 +996,38 @@ async function finishRecording() {
   if (supabase && currentUser) {
     try {
       toast('上傳錄音到雲端...');
-      
-      // Upload audio blob to storage
-      const audioPath = `memories/${currentUser.id}/${id}.webm`;
-      const { error: uploadErr } = await supabase.storage
-        .from('memories')
-        .upload(audioPath, blob, { contentType: 'audio/webm' });
-      
-      if (uploadErr) throw uploadErr;
 
-      // Create memory record in database
+      // 1) Create cloud memory row first to get UUID id
       const { data: dbData, error: dbErr } = await supabase
         .from('memories')
         .insert([{
-          id: id,
           user_id: currentUser.id,
           title: title,
           privacy: 'private',
           duration: recSec,
           recorded_at: new Date().toISOString()
         }])
-        .select('id')
+        .select('id,user_id')
         .single();
 
       if (dbErr) throw dbErr;
+
+      // 2) Upload audio blob to storage with correct extension/content type
+      const cloudId = dbData.id;
+      const audioPath = `memories/${currentUser.id}/${cloudId}.${audioExt}`;
+      const { error: uploadErr } = await supabase.storage
+        .from('memories')
+        .upload(audioPath, blob, { contentType: blob.type || `audio/${audioExt}` });
       
-      mem.cloudId = dbData?.id;
+      if (uploadErr) throw uploadErr;
+      
+      mem.cloudId = cloudId;
+      mem.user_id = currentUser.id;
       mem.isCloud = true;
       toast('已上傳到雲端！');
     } catch (err) {
       console.warn('[Upload] Failed:', err.message);
-      toast('本地保存成功，但雲端上傳失敗');
+      toast('本地保存成功，但雲端上傳失敗：' + (err.message || '未知錯誤'));
     }
   } else {
     toast('已儲存到本機（雲端未連線）');
